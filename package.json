@@ -1,0 +1,12 @@
+{
+	"name": "@device.farm/silicon",
+	"version": "1.0.0",
+	"author": "paul",
+	"dependencies": {
+		"commander": "^2.12.2"
+	},
+	"main": "src/silicon.js",
+	"scripts": {
+		"start": "node src\/silicon.js -C ..\/app clean build"
+	}
+}
