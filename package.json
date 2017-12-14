@@ -3,10 +3,11 @@
 	"version": "1.0.0",
 	"author": "paul",
 	"dependencies": {
-		"commander": "^2.12.2"
+		"commander": "^2.12.2",
+		"xml2js": "^0.4.19"
 	},
 	"main": "src/silicon.js",
 	"scripts": {
-		"start": "node src\/silicon.js -C ..\/app clean build"
+		"start": "node src/silicon.js -C ../app clean build"
 	}
 }
