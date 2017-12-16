@@ -87,7 +87,7 @@ module.exports = async project => {
 
 
 	let elfFile = buildFile("elf");
-	await run("arm-none-eabi-gcc", "-nostdlib", "-fno-exceptions", "-o", elfFile, cppFile);
+	await run("arm-none-eabi-gcc", "-nostdlib", "-O3", "-std=c++14", "-fno-exceptions", "-o", elfFile, cppFile);
 	await run("arm-none-eabi-objdump", "-D", elfFile);
 
 }
