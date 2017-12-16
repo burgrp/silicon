@@ -109,6 +109,7 @@ module.exports = async (svdFile, buildFile) => {
 
 
 			// find field vectors, e.g. STM32F GPIO MODER0..MODER15
+
 			let vectors = {};
 			register.fields[0].field.forEach(f1 => {
 				let m1 = f1.name[0].match(/([a-zA-Z]+)([0-9]+)([a-zA-Z]*)$/);
@@ -147,7 +148,6 @@ module.exports = async (svdFile, buildFile) => {
 			});
 
 			Object.entries(vectors).forEach(([k, v]) => {
-				console.info("------------------", k, "------------------");
 
 				let firstIsMarked;
 				let firstIndex;
@@ -216,8 +216,6 @@ module.exports = async (svdFile, buildFile) => {
 			}
 
 			});
-
-
 
 			register.fields[0].field.filter(field => !field.inVector).forEach(field => {
 
