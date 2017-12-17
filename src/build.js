@@ -72,14 +72,7 @@ module.exports = async project => {
 	}
 	
 	let svdSources = await processSvd(project.dir + svd, buildFile);
-
-//	let svd = await readSvd(mcu);
-//	await createMcuCpp(svd, project.buildFile("cpp", "svd"));
-
-	
-
 	svdSources.concat(project.sources).forEach(s => ln(`#include "..${s}"`));
-
 
 	let cppFile = buildFile("cpp");
 	console.info(cppCode);
@@ -90,4 +83,4 @@ module.exports = async project => {
 	await run("arm-none-eabi-gcc", "-nostdlib", "-O3", "-std=c++14", "-fno-exceptions", "-o", elfFile, cppFile);
 	await run("arm-none-eabi-objdump", "-D", elfFile);
 
-}
+};

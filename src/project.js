@@ -11,7 +11,7 @@ module.exports = async projectDir => {
 
 	async function include(subDir) {
 
-		let package = JSON.parse(await pro(fs.readFile)(`${projectDir}${subDir}/package.json`, "utf8"));
+		let package = JSON.parse(await pro(fs.readFile)(`${projectDir}${subDir}package.json`, "utf8"));
 
 		if (project.packages[package.name]) {
 

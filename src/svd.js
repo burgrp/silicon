@@ -88,6 +88,8 @@ module.exports = async (svdFile, buildFile) => {
 		code.begin("namespace", type.typeName, "{");
 
 
+		code.begin("namespace Register {");
+
 		type.peripheral.registers[0].register.forEach(register => {
 			//console.info(register);
 			code.wl();
@@ -186,9 +188,9 @@ module.exports = async (svdFile, buildFile) => {
 
 					let field = v.fields[firstIndex];
 
-					let fieldName = field.inVector.prefix + (field.inVector.suffix? "_" + field.inVector.suffix: "");
+					let fieldName = field.inVector.prefix + (field.inVector.suffix ? "_" + field.inVector.suffix : "");
 
-					let bitOffset = "(" + firstOffset + " + " + firstDistance + " * (index - " + firstIndex + "))" 
+					let bitOffset = "(" + firstOffset + " + " + firstDistance + " * (index - " + firstIndex + "))"
 					let bitWidth = fieldWidth(field);
 
 					let description = inlineDescription(field);
@@ -245,6 +247,27 @@ module.exports = async (svdFile, buildFile) => {
 
 			code.end("};");
 		});
+		code.end("};");
+
+		code.begin("class Peripheral {");
+		code.wl("public:");
+
+		let checkOffset = 0;
+		type.peripheral.registers[0].register.forEach(register => {
+			let regOffset = svdInt(register.addressOffset);
+			if (regOffset > checkOffset) {
+				code.wl(`volatile char _space${checkOffset}[${regOffset - checkOffset}];`);
+			}
+			checkOffset = regOffset;
+
+			code.begin("/**");
+			code.wl(inlineDescription(register));
+			code.end("*/");
+			code.wl(`volatile  Register::${register.name} ${register.name};`);
+			
+			checkOffset += 4;
+		});
+		code.end("};");
 
 		code.end("}");
 		code.end("}");
