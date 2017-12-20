@@ -263,7 +263,7 @@ module.exports = async (svdFile, buildFile) => {
 			code.begin("/**");
 			code.wl(inlineDescription(register));
 			code.end("*/");
-			code.wl(`volatile  Register::${register.name} ${register.name};`);
+			code.wl(`volatile Register::${register.name} ${register.name};`);
 			
 			checkOffset += 4;
 		});
