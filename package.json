@@ -3,11 +3,12 @@
 	"version": "1.0.0",
 	"author": "paul",
 	"dependencies": {
+		"@device.farm/appglue": "^1.0.6",
 		"commander": "^2.12.2",
 		"xml2js": "^0.4.19"
 	},
 	"main": "src/silicon.js",
 	"scripts": {
-		"start": "node src/silicon.js -C ../app clean build"
+		"start": "node src\/silicon.js -C ..\/STM32F0x2 svd"
 	}
 }

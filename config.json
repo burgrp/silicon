@@ -1,0 +1,10 @@
+{
+	"commands": [
+		{
+			"module": "./build.js"
+		},
+		{
+			"module": "./svd.js"
+		}
+	]
+}
