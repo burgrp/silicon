@@ -4,6 +4,7 @@ const pro = require("util").promisify;
 const fs = require("fs");
 const xml2js = require("xml2js");
 const codeGen = require("./code-gen.js");
+const rmDir = require("./rmdir.js");
 
 module.exports = async config => {
 
@@ -82,20 +83,6 @@ module.exports = async config => {
 
 			function fieldWidth(field) {
 				return svdInt(field.bitWidth);
-			}
-
-			async function rmDir(dir) {
-				let files = await pro(fs.readdir)(dir);
-				for (file of files) {
-					let filePath = dir + "/" + file;
-					let stat = await pro(fs.stat)(filePath);
-					if (stat.isDirectory()) {
-						await rmDir(filePath);
-					} else {
-						await pro(fs.unlink)(filePath);
-					}
-				}
-				await pro(fs.rmdir)(dir);
 			}
 
 			await rmDir("generated");
@@ -297,20 +284,17 @@ module.exports = async config => {
 
 				code.end("}");
 
-
 				code.wl();
 				
-				code.begin('extern "C" {');
 				[type.peripheral].concat(type.derived).forEach(p => {
 					let symbol = p.name[0].toUpperCase();
-					code.wl(type.typeName + "::Peripheral", symbol + ";");
-					symbols[symbol] = p.baseAddress[0];
+					code.wl("extern " + type.typeName + "::Peripheral", symbol + ";");
+					symbols["target::" + symbol] = p.baseAddress[0];
 				});
-				code.end("}");
 
 				code.end("}");
 
-				return pro(fs.writeFile)(fileName, code.toString(), "utf8");
+				return code.toFile(fileName);
 			});
 
 			await Promise.all(writes);
