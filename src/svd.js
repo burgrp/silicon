@@ -122,7 +122,6 @@ module.exports = async config => {
 					code.wl("return raw;");
 					code.end("}");
 
-
 					// find field vectors, e.g. STM32F GPIO MODER0..MODER15
 
 					let vectors = {};
