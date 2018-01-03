@@ -65,6 +65,7 @@ module.exports = async config => {
 				if (!nonDerived.some(p2 => p2.groupName === p.groupName && p2 !== p)) {
 					p.typeName = p.groupName;
 				}
+				p.typeName = p.typeName.toLowerCase();
 			});
 
 			function svdInt(element) {
@@ -102,6 +103,7 @@ module.exports = async config => {
 			await pro(fs.mkdir)("generated");
 
 			var sources = [];
+			var symbols = {};
 
 			var writes = nonDerived.map(type => {
 				let fileName = "generated/" + type.typeName + ".cpp";
@@ -109,10 +111,10 @@ module.exports = async config => {
 
 				let code = codeGen();
 
-				code.begin("namespace MCU {");
+				code.begin("namespace target {");
 				code.begin("namespace", type.typeName, "{");
 
-				code.begin("namespace Register {");
+				code.begin("namespace reg {");
 
 				type.peripheral.registers[0].register.forEach(register => {
 					//console.info(register);
@@ -287,13 +289,25 @@ module.exports = async config => {
 					code.begin("/**");
 					code.wl(inlineDescription(register));
 					code.end("*/");
-					code.wl(`volatile Register::${register.name} ${register.name};`);
+					code.wl(`volatile reg::${register.name} ${register.name};`);
 
 					checkOffset += 4;
 				});
 				code.end("};");
 
 				code.end("}");
+
+
+				code.wl();
+				
+				code.begin('extern "C" {');
+				[type.peripheral].concat(type.derived).forEach(p => {
+					let symbol = p.name[0].toUpperCase();
+					code.wl(type.typeName + "::Peripheral", symbol + ";");
+					symbols[symbol] = p.baseAddress[0];
+				});
+				code.end("}");
+
 				code.end("}");
 
 				return pro(fs.writeFile)(fileName, code.toString(), "utf8");
@@ -303,19 +317,27 @@ module.exports = async config => {
 
 			let package = JSON.parse(await pro(fs.readFile)("package.json", "utf8"));
 
+			let interrupts = {};
+			device.peripherals[0].peripheral.forEach(p => {
+				(p.interrupt || []).forEach(i => {
+					interrupts[i.value[0]] = i.name[0];
+				});
+			});
+
 			Object.assign(package, {
 				silicon: {
 					target: {
 						name: device.name[0],
 						cpu: device.cpu[0].name[0]
-					}
+					},
+					sources,
+					symbols,
+					interrupts
 				}
 			});
 
-			package.silicon.sources = sources;
-
 			await pro(fs.writeFile)("package.json", JSON.stringify(package, null, 2));
-			
+
 			console.info("All done.");
 		}
 	};

@@ -9,6 +9,6 @@
 	},
 	"main": "src/silicon.js",
 	"scripts": {
-		"start": "node src\/silicon.js -C ..\/STM32F0x2 svd"
+		"start": "node src\/silicon.js -C ..\/STM32F0x2 svd ..\/..\/svd\/STM32F0x2.svd"
 	}
 }
