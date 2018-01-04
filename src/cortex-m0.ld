@@ -4,7 +4,7 @@ SECTIONS
 {
    .text ROM_START : {
 	   *(.stack_ptr*) 
-	   *(.vectors*) 
+	   *(.interrupts*) 
 	   *(.text*)
    } 
 

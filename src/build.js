@@ -116,23 +116,25 @@ module.exports = async config => {
 
 			let vectorsSFile = "build/vectors.S";
 			let vectorsS = codeGen();
-			vectorsS.wl(`.section .vectors`);
-			vectorsS.wl(`ui:`);
+			vectorsS.wl(`.section .text`);
+			vectorsS.wl(`.weak fatalError`);
+			vectorsS.wl(`fatalError:`);
+			vectorsS.wl(`b fatalError`);
+			
+			
+			vectorsS.wl(`.section .interrupts`);
+			
 			for (let i = 0; i < interrupts.length; i++) {
 				let interrupt = interrupts[i];
 
 				if (interrupt) {
-					//vectorsS.wl(`.ifndef interruptHandler${interrupt}`);
 					vectorsS.wl(`.weak interruptHandler${interrupt}`);
-					vectorsS.wl(`.set interruptHandler${interrupt}, ui`);
+					vectorsS.wl(`.set interruptHandler${interrupt}, fatalError`);
 					vectorsS.wl(`.word interruptHandler${interrupt} + 1`);
-					//vectorsS.wl(`.endif`);
 				} else {
-					vectorsS.wl(".word _unhandledInterrupt + 1");
+					vectorsS.wl(".word fatalError + 1");
 				}
 			}
-
-			//console.info(vectorsS.toString());
 
 			vectorsS.toFile(vectorsSFile);
 
