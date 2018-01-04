@@ -1,7 +1,12 @@
 {
 	"commands": [
 		{
-			"module": "./build.js"
+			"module": "./build.js",
+			"cpus": {
+				"CM0": {
+					"module": "./cortex-m0.js"
+				}
+			}
 		},
 		{
 			"module": "./svd.js"

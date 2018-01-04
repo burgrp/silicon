@@ -288,7 +288,7 @@ module.exports = async config => {
 				[type.peripheral].concat(type.derived).forEach(p => {
 					let symbol = p.name[0].toUpperCase();
 					code.wl("extern " + type.typeName + "::Peripheral", symbol + ";");
-					symbols["target::" + symbol] = p.baseAddress[0];
+					symbols["_ZN6target" + symbol.length + symbol + "E"] = p.baseAddress[0];
 				});
 
 				code.end("}");

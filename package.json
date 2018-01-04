@@ -9,6 +9,6 @@
 	},
 	"main": "src/silicon.js",
 	"scripts": {
-		"start": "node src\/silicon.js -C ..\/app build -D"
+		"start": "node src\/silicon.js -C ..\/app build"
 	}
 }
