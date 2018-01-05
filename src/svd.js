@@ -320,8 +320,6 @@ module.exports = async config => {
 			});
 
 			await pro(fs.writeFile)("package.json", JSON.stringify(package, null, 2));
-
-			console.info("All done.");
 		}
 	};
 

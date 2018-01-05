@@ -6,30 +6,37 @@ const rmDir = require("./rmdir.js");
 
 module.exports = async config => {
 
-	async function run(cmd, ...args) {
-		console.info(">", cmd, ...args);
-		return new Promise((resolve, reject) => {
-			let proc = spawn(cmd, args, {
-				stdio: "inherit"
-			});
-			proc.on("close", code => {
-				if (code === 0) {
-					resolve();
-				} else {
-					reject(`${cmd} returned code ${code}`);
-				}
-			});
-		});
-	}
-
-
 	return {
 		async init(cli) {
 			return cli.command("build")
-					.option("-D, --dependencies [dependencies]", "run 'npm install' to update dependencies prior to the build");
+					.option("-v, --verbose", "be verbose, display commands being run")
+					.option("-d, --dependencies [dependencies]", "run 'npm install' to update dependencies prior to the build")
+					.option("-a, --disassembly", "run 'objdump' to disassembly the image after build")
+					.option("-s, --size", "run 'size' to display image size after build")
+					.option("-f, --flash [port]", "flash the image using given port")
+					.option("-l, --loop", "stay in loop and repeat build after each source file modification");
+
 		},
 
 		async start(command) {
+
+			async function run(cmd, ...args) {
+				if (command.verbose) {
+					console.info(">", cmd, ...args);
+				}
+				return new Promise((resolve, reject) => {
+					let proc = spawn(cmd, args, {
+						stdio: "inherit"
+					});
+					proc.on("close", code => {
+						if (code === 0) {
+							resolve();
+						} else {
+							reject(`${cmd} returned code ${code}`);
+						}
+					});
+				});
+			}
 
 			let buildDir = "build";
 
@@ -120,10 +127,10 @@ module.exports = async config => {
 			interruptsS.wl(`.weak fatalError`);
 			interruptsS.wl(`fatalError:`);
 			interruptsS.wl(`b fatalError`);
-			
-			
+
+
 			interruptsS.wl(`.section .interrupts`);
-			
+
 			for (let i = 0; i < interrupts.length; i++) {
 				let interrupt = interrupts[i];
 				let handler = "interruptHandler" + interrupt;
@@ -161,8 +168,14 @@ module.exports = async config => {
 			];
 
 			await run(cpu.gccPrefix + "gcc", ...gccParams);
-			await run(cpu.gccPrefix + "objdump", "-D", imageFile);
-			await run(cpu.gccPrefix + "size", imageFile);
+
+			if (command.disassembly) {
+				await run(cpu.gccPrefix + "objdump", "-D", imageFile);
+			}
+
+			if (command.size) {
+				await run(cpu.gccPrefix + "size", imageFile);
+			}
 
 		}
 	};

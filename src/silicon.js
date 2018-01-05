@@ -6,7 +6,7 @@ const appglue = require("@device.farm/appglue");
 async function start() {
 
 	cli
-			.option("-C, --directory [directory]", "change to directory");
+			.option("-c, --directory [directory]", "change directory");
 
 	const app = await appglue.load(require);
 
@@ -27,8 +27,7 @@ async function start() {
 	}
 	
 	cli.parse(process.argv);
-	if (cli.directory) {
-		console.info("Changing directory to", cli.directory);
+	if (cli.directory) {		
 		process.chdir(cli.directory);
 	}
 
