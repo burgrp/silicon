@@ -22,7 +22,7 @@ module.exports = async config => {
 
 			async function run(cmd, ...args) {
 				if (command.verbose) {
-					console.info(">", cmd, ...args);
+					console.info(cmd, ...args);
 				}
 				return new Promise((resolve, reject) => {
 					let proc = spawn(cmd, args, {
@@ -151,7 +151,8 @@ module.exports = async config => {
 			let gccParams = [
 				"-T", cpu.ldScript,
 				"-nostdlib",
-				"-O3",
+				"-g",
+				//"-O3",
 				"-std=c++14",
 				"-fno-rtti",
 				"-fno-exceptions",
