@@ -114,29 +114,30 @@ module.exports = async config => {
 							)
 					);
 
-			let vectorsSFile = "build/vectors.S";
-			let vectorsS = codeGen();
-			vectorsS.wl(`.section .text`);
-			vectorsS.wl(`.weak fatalError`);
-			vectorsS.wl(`fatalError:`);
-			vectorsS.wl(`b fatalError`);
+			let interruptsSFile = "build/interrupts.S";
+			let interruptsS = codeGen();
+			interruptsS.wl(`.section .text`);
+			interruptsS.wl(`.weak fatalError`);
+			interruptsS.wl(`fatalError:`);
+			interruptsS.wl(`b fatalError`);
 			
 			
-			vectorsS.wl(`.section .interrupts`);
+			interruptsS.wl(`.section .interrupts`);
 			
 			for (let i = 0; i < interrupts.length; i++) {
 				let interrupt = interrupts[i];
-
+				let handler = "interruptHandler" + interrupt;
+				handler = "_Z" + handler.length + handler + "v";
 				if (interrupt) {
-					vectorsS.wl(`.weak interruptHandler${interrupt}`);
-					vectorsS.wl(`.set interruptHandler${interrupt}, fatalError`);
-					vectorsS.wl(`.word interruptHandler${interrupt} + 1`);
+					interruptsS.wl(`.weak ${handler}`);
+					interruptsS.wl(`.set ${handler}, fatalError`);
+					interruptsS.wl(`.word ${handler} + 1`);
 				} else {
-					vectorsS.wl(".word fatalError + 1");
+					interruptsS.wl(".word fatalError + 1");
 				}
 			}
 
-			vectorsS.toFile(vectorsSFile);
+			interruptsS.toFile(interruptsSFile);
 
 			let imageFile = "build/build.elf";
 
@@ -154,13 +155,14 @@ module.exports = async config => {
 					return acc.concat(Object.entries(p.silicon.symbols || {}).map(([k, v]) => `-Wl,--defsym,${k}=${v}`));
 				}, []),
 				"-o", imageFile,
-				vectorsSFile,
+				interruptsSFile,
 				cpu.startS,
 				cppFile
 			];
 
 			await run(cpu.gccPrefix + "gcc", ...gccParams);
 			await run(cpu.gccPrefix + "objdump", "-D", imageFile);
+			await run(cpu.gccPrefix + "size", imageFile);
 
 		}
 	};

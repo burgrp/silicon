@@ -5,8 +5,8 @@ _vectors:
 .word _stack_top
 
 .section .text
-.global interruptHandlerReset
-interruptHandlerReset:
+.global _Z21interruptHandlerResetv
+_Z21interruptHandlerResetv:
 
 /* copy data */
 ldr r4, =_data_src
