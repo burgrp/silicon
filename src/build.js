@@ -40,8 +40,14 @@ module.exports = async config => {
 
 			let buildDir = "build";
 
-			await rmDir(buildDir);
-			await pro(fs.mkdir)(buildDir);
+			await rmDir(buildDir, true);
+			try {
+				await pro(fs.mkdir)(buildDir);
+			} catch (e) {
+				if (e.code !== "EEXIST") {
+					throw e;
+				}
+			}
 
 			let code = codeGen();
 
@@ -152,7 +158,7 @@ module.exports = async config => {
 				"-T", cpu.ldScript,
 				"-nostdlib",
 				"-g",
-				//"-O3",
+				"-Og",
 				"-std=c++14",
 				"-fno-rtti",
 				"-fno-exceptions",
@@ -171,7 +177,7 @@ module.exports = async config => {
 			await run(cpu.gccPrefix + "gcc", ...gccParams);
 
 			if (command.disassembly) {
-				await run(cpu.gccPrefix + "objdump", "-D", imageFile);
+				await run(cpu.gccPrefix + "objdump", "--section=.text", "-D", imageFile);
 			}
 
 			if (command.size) {
