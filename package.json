@@ -10,6 +10,6 @@
 	},
 	"main": "src/silicon.js",
 	"scripts": {
-		"start": "node src/silicon.js -c ../app build -sf"
+		"start": "node src\/silicon.js -c ..\/app build -sl"
 	}
 }

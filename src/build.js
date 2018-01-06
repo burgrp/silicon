@@ -39,168 +39,206 @@ module.exports = async config => {
 				});
 			}
 
-			let buildDir = "build";
+			let watched;
 
-			await rmDir(buildDir, true);
-			try {
-				await pro(fs.mkdir)(buildDir);
-			} catch (e) {
-				if (e.code !== "EEXIST") {
-					throw e;
-				}
-			}
+			async function build() {
 
-			let code = codeGen();
+				watched = [];
+				let buildDir = "build";
 
-			code.wl("#include <stdlib.h>");
-
-			if (command.dependencies) {
-				await run("npm", "install");
-			}
-
-			let packages = {};
-
-			async function scan(directory) {
-				//console.info("Scanning", directory);
-
-				let package = JSON.parse(await pro(fs.readFile)(directory + "/package.json", "utf8"));
-
-				if (packages[package.name]) {
-
-					if (package.version !== packages[package.name].version) {
-						throw `${package.name} version conflict ${package.version} ${packages[package.name].version}`;
+				await rmDir(buildDir, true);
+				try {
+					await pro(fs.mkdir)(buildDir);
+				} catch (e) {
+					if (e.code !== "EEXIST") {
+						throw e;
 					}
-
-				} else {
-
-					package.directory = directory;
-
-					for (let dep in package.dependencies) {
-						await scan(directory + "/node_modules/" + dep);
-					}
-
-					packages[package.name] = package;
 				}
 
-			}
+				let code = codeGen();
 
-			await scan(".");
+				code.wl("#include <stdlib.h>");
 
-			let siliconPackages = Object.values(packages).filter(p => p.silicon);
+				if (command.dependencies) {
+					await run("npm", "install");
+				}
 
-			siliconPackages.forEach(p => {
-				(p.silicon.sources || []).forEach(s => {
-					code.wl(`#include "../${p.directory}/${s}"`);
+				let packages = {};
+
+				async function scan(directory) {
+					//console.info("Scanning", directory);
+
+					let package = JSON.parse(await pro(fs.readFile)(directory + "/package.json", "utf8"));
+					watched.push(directory + "/package.json");
+
+					if (packages[package.name]) {
+
+						if (package.version !== packages[package.name].version) {
+							throw `${package.name} version conflict ${package.version} ${packages[package.name].version}`;
+						}
+
+					} else {
+
+						package.directory = directory;
+
+						for (let dep in package.dependencies) {
+							await scan(directory + "/node_modules/" + dep);
+						}
+
+						packages[package.name] = package;
+					}
+
+				}
+
+				await scan(".");
+
+				let siliconPackages = Object.values(packages).filter(p => p.silicon);
+
+				siliconPackages.forEach(p => {
+					(p.silicon.sources || []).forEach(s => {
+						code.wl(`#include "../${p.directory}/${s}"`);
+						watched.push(`${p.directory}/${s}`);
+					});
 				});
-			});
 
-			let cppFile = "build/build.cpp";
-			await code.toFile(cppFile);
+				let cppFile = "build/build.cpp";
+				await code.toFile(cppFile);
 
-			let target;
-			siliconPackages.forEach(p => {
-				if (p.silicon && p.silicon.target) {
-					if (target) {
-						throw "Target is defined twice";
+				let target;
+				siliconPackages.forEach(p => {
+					if (p.silicon && p.silicon.target) {
+						if (target) {
+							throw "Target is defined twice";
+						}
+						target = p.silicon.target;
 					}
-					target = p.silicon.target;
-				}
-			});
-
-			let cpu = config.cpus[target.cpu];
-			if (!cpu) {
-				throw "Unsupported CPU: " + target.cpu;
-			}
-
-			function mapToArray(map, firstIndex = 0) {
-				return 	Object.entries(map).reduce((acc, [k, v]) => {
-					acc[parseInt(k) - firstIndex] = v;
-					return acc;
-				}, []);
-			}
-
-			let interrupts = mapToArray(cpu.interrupts || {}, 1).concat(
-					mapToArray(
-							siliconPackages.reduce((acc, p) => {
-								Object.entries(p.silicon.interrupts || {}).forEach(([k, v]) => acc[k] = v);
-								return acc;
-							}, {})
-							)
-					);
-
-			let interruptsSFile = "build/interrupts.S";
-			let interruptsS = codeGen();
-			interruptsS.wl(`.section .text`);
-			interruptsS.wl(`.weak fatalError`);
-			interruptsS.wl(`fatalError:`);
-			interruptsS.wl(`b fatalError`);
-
-
-			interruptsS.wl(`.section .interrupts`);
-
-			for (let i = 0; i < interrupts.length; i++) {
-				let interrupt = interrupts[i];
-				let handler = "interruptHandler" + interrupt;
-				handler = "_Z" + handler.length + handler + "v";
-				if (interrupt) {
-					interruptsS.wl(`.weak ${handler}`);
-					interruptsS.wl(`.set ${handler}, fatalError`);
-					interruptsS.wl(`.word ${handler} + 1`);
-				} else {
-					interruptsS.wl(".word fatalError + 1");
-				}
-			}
-
-			interruptsS.toFile(interruptsSFile);
-
-			let imageFile = "build/build.elf";
-
-			let gccParams = [
-				"-T", cpu.ldScript,
-				"-nostdlib",
-				"-g",
-				"-Og",
-				"-std=c++14",
-				"-fno-rtti",
-				"-fno-exceptions",
-				"-ffunction-sections",
-				"-fdata-sections",
-				...cpu.gccParams,
-				...siliconPackages.reduce((acc, p) => {
-					return acc.concat(Object.entries(p.silicon.symbols || {}).map(([k, v]) => `-Wl,--defsym,${k}=${v}`));
-				}, []),
-				"-o", imageFile,
-				interruptsSFile,
-				cpu.startS,
-				cppFile
-			];
-
-			await run(cpu.gccPrefix + "gcc", ...gccParams);
-
-			if (command.disassembly) {
-				await run(cpu.gccPrefix + "objdump", "--section=.text", "-D", imageFile);
-			}
-
-			if (command.size) {
-				await run(cpu.gccPrefix + "size", imageFile);
-			}
-
-			if (command.flash) {
-
-				let connection = new Telnet();
-				let port = command.flash === true ? 4444 : parseInt(command.flash);
-
-				await connection.connect({
-					port,
-					shellPrompt: "> ",
-					debug: true
 				});
-				let res = await connection.exec("program " + process.cwd() + "/" + imageFile);
-				console.info('async result:', res);
-				
-				await connection.end();
-				
+
+				let cpu = config.cpus[target.cpu];
+				if (!cpu) {
+					throw "Unsupported CPU: " + target.cpu;
+				}
+
+				function mapToArray(map, firstIndex = 0) {
+					return 	Object.entries(map).reduce((acc, [k, v]) => {
+						acc[parseInt(k) - firstIndex] = v;
+						return acc;
+					}, []);
+				}
+
+				let interrupts = mapToArray(cpu.interrupts || {}, 1).concat(
+						mapToArray(
+								siliconPackages.reduce((acc, p) => {
+									Object.entries(p.silicon.interrupts || {}).forEach(([k, v]) => acc[k] = v);
+									return acc;
+								}, {})
+								)
+						);
+
+				let interruptsSFile = "build/interrupts.S";
+				let interruptsS = codeGen();
+				interruptsS.wl(`.section .text`);
+				interruptsS.wl(`.weak fatalError`);
+				interruptsS.wl(`fatalError:`);
+				interruptsS.wl(`b fatalError`);
+
+
+				interruptsS.wl(`.section .interrupts`);
+
+				for (let i = 0; i < interrupts.length; i++) {
+					let interrupt = interrupts[i];
+					let handler = "interruptHandler" + interrupt;
+					handler = "_Z" + handler.length + handler + "v";
+					if (interrupt) {
+						interruptsS.wl(`.weak ${handler}`);
+						interruptsS.wl(`.set ${handler}, fatalError`);
+						interruptsS.wl(`.word ${handler} + 1`);
+					} else {
+						interruptsS.wl(".word fatalError + 1");
+					}
+				}
+
+				interruptsS.toFile(interruptsSFile);
+
+				let imageFile = "build/build.elf";
+
+				let gccParams = [
+					"-T", cpu.ldScript,
+					"-nostdlib",
+					"-g",
+					"-Og",
+					"-std=c++14",
+					"-fno-rtti",
+					"-fno-exceptions",
+					"-ffunction-sections",
+					"-fdata-sections",
+					...cpu.gccParams,
+					...siliconPackages.reduce((acc, p) => {
+						return acc.concat(Object.entries(p.silicon.symbols || {}).map(([k, v]) => `-Wl,--defsym,${k}=${v}`));
+					}, []),
+					"-o", imageFile,
+					interruptsSFile,
+					cpu.startS,
+					cppFile
+				];
+
+				await run(cpu.gccPrefix + "gcc", ...gccParams);
+
+				if (command.disassembly) {
+					await run(cpu.gccPrefix + "objdump", "--section=.text", "-D", imageFile);
+				}
+
+				if (command.size) {
+					await run(cpu.gccPrefix + "size", imageFile);
+				}
+
+				if (command.flash) {
+
+					let connection = new Telnet();
+					let port = command.flash === true ? 4444 : parseInt(command.flash);
+
+					await connection.connect({
+						port,
+						shellPrompt: "> ",
+						debug: true
+					});
+					let res = await connection.exec("program " + process.cwd() + "/" + imageFile);
+					console.info('async result:', res);
+
+					await connection.end();
+
+				}
 			}
+
+			async function watchedChanged() {
+				return new Promise((resolve, reject) => {
+					console.info("Waiting for a source file change...");
+					let watchers = [];
+					watched.forEach(file => {
+						watchers.push(fs.watch(file, () => {
+							watchers.forEach(w => w.close());
+							console.info(file, "changed");
+							resolve();
+						}));
+					});
+				});
+			};
+
+			do {
+				try {
+					await build();
+				} catch (e) {
+					if (command.loop) {
+						console.error(e);
+					} else {
+						throw e;
+					}
+				}
+				if (!command.loop) {
+					break;
+				}
+				await watchedChanged();				
+			} while (true);
 
 		}
 	};
