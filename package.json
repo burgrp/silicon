@@ -5,10 +5,11 @@
 	"dependencies": {
 		"@device.farm/appglue": "^1.0.6",
 		"commander": "^2.12.2",
+		"telnet-client": "^0.15.5",
 		"xml2js": "^0.4.19"
 	},
 	"main": "src/silicon.js",
 	"scripts": {
-		"start": "node src\/silicon.js -c ..\/app build"
+		"start": "node src/silicon.js -c ../app build -sf"
 	}
 }

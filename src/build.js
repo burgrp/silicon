@@ -3,6 +3,7 @@ const fs = require("fs");
 const spawn = require("child_process").spawn;
 const codeGen = require("./code-gen.js");
 const rmDir = require("./rmdir.js");
+const Telnet = require("telnet-client");
 
 module.exports = async config => {
 
@@ -13,7 +14,7 @@ module.exports = async config => {
 					.option("-d, --dependencies [dependencies]", "run 'npm install' to update dependencies prior to the build")
 					.option("-a, --disassembly", "run 'objdump' to disassembly the image after build")
 					.option("-s, --size", "run 'size' to display image size after build")
-					.option("-f, --flash [port]", "flash the image using given port")
+					.option("-f, --flash [port]", "flash the image using OpenOCD on given localhost port, defaults to 4444")
 					.option("-l, --loop", "stay in loop and repeat build after each source file modification");
 
 		},
@@ -182,6 +183,23 @@ module.exports = async config => {
 
 			if (command.size) {
 				await run(cpu.gccPrefix + "size", imageFile);
+			}
+
+			if (command.flash) {
+
+				let connection = new Telnet();
+				let port = command.flash === true ? 4444 : parseInt(command.flash);
+
+				await connection.connect({
+					port,
+					shellPrompt: "> ",
+					debug: true
+				});
+				let res = await connection.exec("program " + process.cwd() + "/" + imageFile);
+				console.info('async result:', res);
+				
+				await connection.end();
+				
 			}
 
 		}
