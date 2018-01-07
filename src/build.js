@@ -202,8 +202,18 @@ module.exports = async config => {
 						shellPrompt: "> ",
 						debug: true
 					});
-					let res = await connection.exec("program " + process.cwd() + "/" + imageFile);
-					console.info('async result:', res);
+
+					async function exec(cmd) {
+						let res = await connection.exec(cmd);
+						console.info(res);
+						return res;
+					}
+
+					await exec("halt");
+					await exec("flash write_image erase " + process.cwd() + "/" + imageFile);
+					await exec("reset run");
+					//await exec("program " + process.cwd() + "/" + imageFile);
+
 
 					await connection.end();
 
@@ -222,7 +232,8 @@ module.exports = async config => {
 						}));
 					});
 				});
-			};
+			}
+			;
 
 			do {
 				try {
@@ -237,7 +248,7 @@ module.exports = async config => {
 				if (!command.loop) {
 					break;
 				}
-				await watchedChanged();				
+				await watchedChanged();
 			} while (true);
 
 		}
