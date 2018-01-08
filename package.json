@@ -11,5 +11,8 @@
 	"main": "src/silicon.js",
 	"scripts": {
 		"start": "node src\/silicon.js -c ..\/app build -sf"
+	},
+	"bin": {
+		"silicon": "src/main.js"
 	}
 }
