@@ -1,6 +1,6 @@
 {
 	"name": "@device.farm/silicon",
-	"version": "1.0.0",
+	"version": "1.0.1",
 	"author": "paul",
 	"dependencies": {
 		"@device.farm/appglue": "^1.0.6",
@@ -10,7 +10,7 @@
 	},
 	"main": "src/silicon.js",
 	"scripts": {
-		"start": "node src\/silicon.js -c ..\/app build -sf"
+		"start": "node src/silicon.js -c ../app build -sf"
 	},
 	"bin": {
 		"silicon": "src/main.js"
