@@ -13,6 +13,6 @@
 		"start": "node src/silicon.js -c ../app build -sf"
 	},
 	"bin": {
-		"silicon": "src/main.js"
+		"silicon": "src/silicon.js"
 	}
 }
