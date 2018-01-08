@@ -8,7 +8,7 @@ async function start() {
 	cli
 			.option("-c, --directory [directory]", "change directory");
 
-	const app = await appglue.load(require);
+	const app = await appglue.load(require, __dirname + "/../config.json");
 
 	let commandToRun;
 
