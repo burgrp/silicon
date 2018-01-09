@@ -263,28 +263,32 @@ module.exports = async config => {
 
 				code.begin("class Peripheral {");
 				code.wl("public:");
+				code.begin("union {");
 
-				let checkOffset = 0;
 				type.peripheral.registers[0].register.forEach(register => {
+
 					let regOffset = svdInt(register.addressOffset);
-					if (regOffset > checkOffset) {
-						code.wl(`volatile char _space${checkOffset}[${regOffset - checkOffset}];`);
+
+					code.begin("struct {");
+					if (regOffset > 0) {
+						code.wl(`volatile char _space_${register.name}[${regOffset}];`);
 					}
-					checkOffset = regOffset;
 
 					code.begin("/**");
 					code.wl(inlineDescription(register));
 					code.end("*/");
 					code.wl(`volatile reg::${register.name} ${register.name};`);
 
-					checkOffset += 4;
+					code.end("};");
 				});
+
+				code.end("};");
 				code.end("};");
 
 				code.end("}");
 
 				code.wl();
-				
+
 				[type.peripheral].concat(type.derived).forEach(p => {
 					let symbol = p.name[0].toUpperCase();
 					code.wl("extern " + type.typeName + "::Peripheral", symbol + ";");

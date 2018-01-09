@@ -10,7 +10,7 @@
 	},
 	"main": "src/silicon.js",
 	"scripts": {
-		"start": "node src/silicon.js -c ../app build -sf"
+		"start": "node src\/silicon.js -c ..\/app -c ..\/STM32F0x2\/ svd ..\/svd\/STM32F0x2.svd"
 	},
 	"bin": {
 		"silicon": "src/silicon.js"
