@@ -104,6 +104,12 @@ module.exports = async config => {
 				code.begin("namespace reg {");
 
 				type.peripheral.registers[0].register.forEach(register => {
+					
+					let registerSize = svdInt(register.size);
+					if (registerSize !== 32) {
+						throw `Register ${type.peripheral.name}.${register.name[0]} has size ${registerSize}`;
+					}
+					
 					//console.info(register);
 					code.wl();
 					code.begin("/**");
