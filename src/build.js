@@ -209,11 +209,9 @@ module.exports = async config => {
 						return res;
 					}
 
-					await exec("halt");
+					await exec("reset halt");
 					await exec("flash write_image erase " + process.cwd() + "/" + imageFile);
 					await exec("reset run");
-					//await exec("program " + process.cwd() + "/" + imageFile);
-
 
 					await connection.end();
 
