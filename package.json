@@ -1,6 +1,6 @@
 {
 	"name": "@device.farm/silicon",
-	"version": "1.0.7",
+	"version": "1.0.8",
 	"author": "paul",
 	"dependencies": {
 		"@device.farm/appglue": "^1.0.6",
@@ -10,7 +10,7 @@
 	},
 	"main": "src/silicon.js",
 	"scripts": {
-		"start": "node src\/silicon.js -c ..\/app -c \/home\/paul\/df\/silicon-examples\/blink-swtimer build -ds"
+		"start": "node src/silicon.js -c ../app -c /home/paul/df/silicon-examples/blink-swtimer build -ds"
 	},
 	"bin": {
 		"silicon": "src/silicon.js"
