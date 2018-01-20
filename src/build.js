@@ -62,7 +62,7 @@ module.exports = async config => {
 				let packages = {};
 
 				async function scan(directory) {
-					
+
 					if (command.verbose) {
 						console.info("Scanning", directory);
 					}
@@ -81,19 +81,7 @@ module.exports = async config => {
 						package.directory = directory;
 
 						for (let dep in package.dependencies) {
-							let tagOrPath = package.dependencies[dep];
-							try {
-								await pro(fs.access)(directory + "/" + tagOrPath);
-								await scan(directory + "/" + tagOrPath);
-							} catch (e) {
-								if (e.code === "ENOENT") {
-									await scan(directory + "/node_modules/" + dep);
-								} else {
-									throw e;
-								}
-							}
-
-
+							await scan("./node_modules/" + dep);
 						}
 
 						packages[package.name] = package;
@@ -160,12 +148,17 @@ module.exports = async config => {
 				buildCpp.end("}");
 				buildCpp.wl();
 
-				siliconPackages.forEach(p => {
-					(p.silicon.sources || []).forEach(s => {
-						buildCpp.wl(`#include "../${p.directory}/${s}"`);
-						watched.push(`${p.directory}/${s}`);
+				function addIncludes(packages) {
+					packages.forEach(p => {
+						(p.silicon.sources || []).forEach(s => {
+							buildCpp.wl(`#include "../${p.directory}/${s}"`);
+							watched.push(`${p.directory}/${s}`);
+						});
 					});
-				});
+				}
+				
+				addIncludes(siliconPackages.filter(p => p.silicon.target));
+				addIncludes(siliconPackages.filter(p => !p.silicon.target));
 
 				let buildCppFile = "build/build.cpp";
 				await buildCpp.toFile(buildCppFile);
