@@ -78,7 +78,19 @@ module.exports = async config => {
 						package.directory = directory;
 
 						for (let dep in package.dependencies) {
-							await scan(directory + "/node_modules/" + dep);
+							let tagOrPath = package.dependencies[dep];
+							try {
+								await pro(fs.access)(tagOrPath);							
+								await scan(tagOrPath);
+							} catch(e) {
+								if (e.code === "ENOENT") {
+									await scan(directory + "/node_modules/" + dep);
+								} else {
+									throw e;
+								}
+							}
+							
+							
 						}
 
 						packages[package.name] = package;
