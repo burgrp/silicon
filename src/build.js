@@ -62,7 +62,10 @@ module.exports = async config => {
 				let packages = {};
 
 				async function scan(directory) {
-					//console.info("Scanning", directory);
+					
+					if (command.verbose) {
+						console.info("Scanning", directory);
+					}
 
 					let package = JSON.parse(await pro(fs.readFile)(directory + "/package.json", "utf8"));
 					watched.push(directory + "/package.json");
@@ -80,17 +83,17 @@ module.exports = async config => {
 						for (let dep in package.dependencies) {
 							let tagOrPath = package.dependencies[dep];
 							try {
-								await pro(fs.access)(directory + "/" + tagOrPath);							
+								await pro(fs.access)(directory + "/" + tagOrPath);
 								await scan(directory + "/" + tagOrPath);
-							} catch(e) {
+							} catch (e) {
 								if (e.code === "ENOENT") {
 									await scan(directory + "/node_modules/" + dep);
 								} else {
 									throw e;
 								}
 							}
-							
-							
+
+
 						}
 
 						packages[package.name] = package;
