@@ -55,10 +55,6 @@ module.exports = async config => {
 					}
 				}
 
-				let code = codeGen();
-
-				code.wl("#include <stdlib.h>");
-
 				if (command.dependencies) {
 					await run("npm", "install");
 				}
@@ -91,18 +87,7 @@ module.exports = async config => {
 				}
 
 				await scan(".");
-
 				let siliconPackages = Object.values(packages).filter(p => p.silicon);
-
-				siliconPackages.forEach(p => {
-					(p.silicon.sources || []).forEach(s => {
-						code.wl(`#include "../${p.directory}/${s}"`);
-						watched.push(`${p.directory}/${s}`);
-					});
-				});
-
-				let cppFile = "build/build.cpp";
-				await code.toFile(cppFile);
 
 				let target;
 				siliconPackages.forEach(p => {
@@ -134,6 +119,41 @@ module.exports = async config => {
 								}, {})
 								)
 						);
+
+
+				let buildCpp = codeGen();
+
+				buildCpp.wl("#include <stdlib.h>");
+
+				buildCpp.wl();
+				buildCpp.begin("namespace target {");
+				buildCpp.begin("namespace interrupts {");
+				function writeInterrupts(kind, start, end) {
+					buildCpp.begin(`namespace ${kind} {`);
+					for (let n = start; n < end; n++) {
+						let name = interrupts[n];
+						if (name) {
+							buildCpp.wl(`const int ${name} = ${n - start};`);
+						}
+					}
+					buildCpp.end("}");
+				}
+				writeInterrupts("Internal", 0, 15);
+				writeInterrupts("External", 15, interrupts.length);
+				writeInterrupts("All", 0, interrupts.length);
+				buildCpp.end("}");
+				buildCpp.end("}");
+				buildCpp.wl();
+
+				siliconPackages.forEach(p => {
+					(p.silicon.sources || []).forEach(s => {
+						buildCpp.wl(`#include "../${p.directory}/${s}"`);
+						watched.push(`${p.directory}/${s}`);
+					});
+				});
+
+				let buildCppFile = "build/build.cpp";
+				await buildCpp.toFile(buildCppFile);
 
 				let interruptsSFile = "build/interrupts.S";
 				let interruptsS = codeGen();
@@ -179,7 +199,7 @@ module.exports = async config => {
 					"-o", imageFile,
 					interruptsSFile,
 					cpu.startS,
-					cppFile
+					buildCppFile
 				];
 
 				await run(cpu.gccPrefix + "gcc", ...gccParams);
