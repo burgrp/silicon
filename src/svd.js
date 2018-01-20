@@ -117,7 +117,6 @@ module.exports = async config => {
 					code.end("*/");
 					code.begin("class", register.name, "{");
 
-
 					code.wl("volatile unsigned long raw;");
 					code.wl("public:");
 
@@ -208,7 +207,7 @@ module.exports = async config => {
 
 							let fieldName = field.inVector.prefix + (field.inVector.suffix ? "_" + field.inVector.suffix : "");
 
-							let bitOffset = "(" + firstOffset + " + " + firstDistance + " * (index - " + firstIndex + "))"
+							let bitOffset = "(" + firstOffset + " + " + firstDistance + " * (index - " + firstIndex + "))";
 							let bitWidth = fieldWidth(field);
 
 							let description = inlineDescription(field);
