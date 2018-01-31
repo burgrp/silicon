@@ -1,6 +1,6 @@
 {
 	"name": "@device.farm/silicon",
-	"version": "1.0.10",
+	"version": "1.0.11",
 	"author": "paul",
 	"dependencies": {
 		"@device.farm/appglue": "^1.0.6",
@@ -10,7 +10,7 @@
 	},
 	"main": "src/silicon.js",
 	"scripts": {
-		"start": "node src\/silicon.js -c \/home\/paul\/df\/silicon-examples\/usbd-vendor-led build -dsvf"
+		"start": "node src/silicon.js -c /home/paul/df/silicon-examples/usbd-vendor-led build -dsvf"
 	},
 	"bin": {
 		"silicon": "src/silicon.js"
