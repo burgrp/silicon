@@ -10,7 +10,7 @@
 	},
 	"main": "src/silicon.js",
 	"scripts": {
-		"start": "node src/silicon.js -c ../app -c /home/paul/df/silicon-examples/blink-timer build -dsvf"
+		"start": "node src\/silicon.js -c \/home\/paul\/df\/silicon-examples\/usbd-vendor-led build -dsvf"
 	},
 	"bin": {
 		"silicon": "src/silicon.js"

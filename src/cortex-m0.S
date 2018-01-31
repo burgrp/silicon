@@ -54,5 +54,7 @@ bl _Z11handleEventv
 b .Laplication_loop
 
 .global __cxa_pure_virtual
-.set __cxa_pure_virtual, fatalError
+__cxa_pure_virtual:
+b fatalError
+
 

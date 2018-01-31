@@ -192,7 +192,9 @@ module.exports = async config => {
 
 				let gccParams = [
 					"-T", cpu.ldScript,
-					"-nostdlib",
+					"-nostartfiles",
+					"--specs=nano.specs",
+					"-fshort-wchar",
 					"-g",
 					"-Og",
 					"-std=c++14",
