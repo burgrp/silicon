@@ -10,6 +10,9 @@
 		},
 		{
 			"module": "./svd.js"
+		},
+		{
+			"module": "./version.js"
 		}
 	]
 }
