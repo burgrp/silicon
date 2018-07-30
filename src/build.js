@@ -124,34 +124,38 @@ module.exports = async config => {
 						);
 
 
-				let buildHpp = codeGen();
+				let siliconHpp = codeGen();
 
-				buildHpp.wl("#include <stdlib.h>");
+				siliconHpp.wl("#ifndef SILICON_HPP");
+				siliconHpp.wl("#define SILICON_HPP");
 
-				buildHpp.wl();
-				buildHpp.begin("namespace target {");
-				buildHpp.begin("namespace interrupts {");
+				siliconHpp.wl();
+								siliconHpp.wl("#include <stdlib.h>");
+
+				siliconHpp.wl();
+				siliconHpp.begin("namespace target {");
+				siliconHpp.begin("namespace interrupts {");
 				function writeInterrupts(kind, start, end) {
-					buildHpp.begin(`namespace ${kind} {`);
+					siliconHpp.begin(`namespace ${kind} {`);
 					for (let n = start; n < end; n++) {
 						let name = interrupts[n];
 						if (name) {
-							buildHpp.wl(`const int ${name} = ${n - start};`);
+							siliconHpp.wl(`const int ${name} = ${n - start};`);
 						}
 					}
-					buildHpp.end("}");
+					siliconHpp.end("}");
 				}
 				writeInterrupts("Internal", 0, 15);
 				writeInterrupts("External", 15, interrupts.length);
 				writeInterrupts("All", 0, interrupts.length);
-				buildHpp.end("}");
-				buildHpp.end("}");
-				buildHpp.wl();
+				siliconHpp.end("}");
+				siliconHpp.end("}");
+				siliconHpp.wl();
 
 				function addIncludes(packages) {
 					packages.forEach(p => {
 						(p.silicon.sources || []).forEach(s => {
-							buildHpp.wl(`#include "../${p.directory}/${s}"`);
+							siliconHpp.wl(`#include "../${p.directory}/${s}"`);
 							watched.push(`${p.directory}/${s}`);
 						});
 					});
@@ -160,13 +164,16 @@ module.exports = async config => {
 				addIncludes(siliconPackages.filter(p => p.silicon.target));
 				addIncludes(siliconPackages.filter(p => !p.silicon.target));
 
-				let buildHppFile = "build/build.hpp";
-				await buildHpp.toFile(buildHppFile);
+				siliconHpp.wl();
+				siliconHpp.wl("#endif // SILICON_HPP");
 
-				let buildCpp = codeGen();
-				buildCpp.wl("#include \"build.hpp\"");
-				let buildCppFile = "build/build.cpp";
-				await buildHpp.toFile(buildCppFile);
+				let siliconHppFile = "build/silicon.hpp";
+				await siliconHpp.toFile(siliconHppFile);
+
+				let siliconCpp = codeGen();
+				siliconCpp.wl("#include \"silicon.hpp\"");
+				let siliconCppFile = "build/silicon.cpp";
+				await siliconHpp.toFile(siliconCppFile);
 
 				let interruptsSFile = "build/interrupts.S";
 				let interruptsS = codeGen();
@@ -196,6 +203,7 @@ module.exports = async config => {
 				let imageFile = "build/build.elf";
 
 				let gccParams = [
+					"-I", "build",
 					"-T", cpu.ldScript,
 					"-nostartfiles",
 					"--specs=nano.specs",
@@ -214,7 +222,7 @@ module.exports = async config => {
 					"-o", imageFile,
 					interruptsSFile,
 					cpu.startS,
-					buildCppFile
+					siliconCppFile
 				];
 
 				await run(cpu.gccPrefix + "gcc", ...gccParams);
