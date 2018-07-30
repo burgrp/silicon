@@ -3,7 +3,7 @@
 const cli = require("commander");
 const appglue = require("@device.farm/appglue");
 
-appglue({ require }).main(async app => {
+appglue({ require, file: __dirname + "/../config.json" }).main(async app => {
 
 	cli
 		.option("-c, --directory [directory]", "change directory");
