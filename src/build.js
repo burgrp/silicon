@@ -124,34 +124,34 @@ module.exports = async config => {
 						);
 
 
-				let buildCpp = codeGen();
+				let buildHpp = codeGen();
 
-				buildCpp.wl("#include <stdlib.h>");
+				buildHpp.wl("#include <stdlib.h>");
 
-				buildCpp.wl();
-				buildCpp.begin("namespace target {");
-				buildCpp.begin("namespace interrupts {");
+				buildHpp.wl();
+				buildHpp.begin("namespace target {");
+				buildHpp.begin("namespace interrupts {");
 				function writeInterrupts(kind, start, end) {
-					buildCpp.begin(`namespace ${kind} {`);
+					buildHpp.begin(`namespace ${kind} {`);
 					for (let n = start; n < end; n++) {
 						let name = interrupts[n];
 						if (name) {
-							buildCpp.wl(`const int ${name} = ${n - start};`);
+							buildHpp.wl(`const int ${name} = ${n - start};`);
 						}
 					}
-					buildCpp.end("}");
+					buildHpp.end("}");
 				}
 				writeInterrupts("Internal", 0, 15);
 				writeInterrupts("External", 15, interrupts.length);
 				writeInterrupts("All", 0, interrupts.length);
-				buildCpp.end("}");
-				buildCpp.end("}");
-				buildCpp.wl();
+				buildHpp.end("}");
+				buildHpp.end("}");
+				buildHpp.wl();
 
 				function addIncludes(packages) {
 					packages.forEach(p => {
 						(p.silicon.sources || []).forEach(s => {
-							buildCpp.wl(`#include "../${p.directory}/${s}"`);
+							buildHpp.wl(`#include "../${p.directory}/${s}"`);
 							watched.push(`${p.directory}/${s}`);
 						});
 					});
@@ -160,8 +160,13 @@ module.exports = async config => {
 				addIncludes(siliconPackages.filter(p => p.silicon.target));
 				addIncludes(siliconPackages.filter(p => !p.silicon.target));
 
+				let buildHppFile = "build/build.hpp";
+				await buildHpp.toFile(buildHppFile);
+
+				let buildCpp = codeGen();
+				buildCpp.wl("#include \"build.hpp\"");
 				let buildCppFile = "build/build.cpp";
-				await buildCpp.toFile(buildCppFile);
+				await buildHpp.toFile(buildCppFile);
 
 				let interruptsSFile = "build/interrupts.S";
 				let interruptsS = codeGen();
