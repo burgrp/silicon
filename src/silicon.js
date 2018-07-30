@@ -3,12 +3,10 @@
 const cli = require("commander");
 const appglue = require("@device.farm/appglue");
 
-async function start() {
+appglue({ require }).main(async app => {
 
 	cli
-			.option("-c, --directory [directory]", "change directory");
-
-	const app = await appglue.load(require, __dirname + "/../config.json");
+		.option("-c, --directory [directory]", "change directory");
 
 	let commandToRun;
 
@@ -25,9 +23,9 @@ async function start() {
 			});
 		}
 	}
-	
+
 	cli.parse(process.argv);
-	if (cli.directory) {		
+	if (cli.directory) {
 		process.chdir(cli.directory);
 	}
 
@@ -43,6 +41,7 @@ async function start() {
 		process.exit(1);
 	}
 
-}
+});
 
-start().catch(console.error);
+
+
