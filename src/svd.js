@@ -166,6 +166,47 @@ module.exports = async config => {
 						}
 					});
 
+					function writeAccessors(fieldName, bitOffset, bitWidth, description, firstIndex, lastIndex) {
+
+						let indexed = firstIndex !== undefined;
+
+						let valueRange = "value in range 0.." + (Math.pow(2, bitWidth) - 1);
+						let indexRange = "index in range " + firstIndex + ".." + lastIndex;
+						let mask = "0x" + (Math.pow(2, bitWidth) - 1).toString(16).toUpperCase();
+						
+						code.begin("/**");
+						code.wl("Gets", description);
+						if (indexed) {
+							code.wl("@param", indexRange);
+						}
+						code.wl("@return", valueRange);
+						code.end("*/");
+						if (indexed) {
+							code.begin("__attribute__((always_inline)) unsigned long", "get" + fieldName + "(int index) volatile {");
+							code.wl("return (raw & (" + mask + " << " + bitOffset + ")) >> " + bitOffset + ";");
+						} else {
+							code.begin("__attribute__((always_inline)) unsigned long", "get" + fieldName + "() volatile {");
+							code.wl("return (raw & (" + mask + " << " + bitOffset + ")) >> " + bitOffset + ";");
+						}
+						code.end("}");
+
+						code.begin("/**");
+						code.wl("Sets", description);
+						if (indexed) {
+							code.wl("@param", indexRange);
+						}
+						code.wl("@param", valueRange);
+						code.end("*/");
+						if (indexed) {
+							code.begin("__attribute__((always_inline)) unsigned long", "set" + fieldName + "(int index, unsigned long value) volatile {");
+							code.wl("raw = (raw & ~(" + mask + " << " + bitOffset + ")) | ((value << " + bitOffset + ") & (" + mask + " << " + bitOffset + "));");
+						} else {
+							code.begin("__attribute__((always_inline)) unsigned long", "set" + fieldName + "(unsigned long value) volatile {");
+							code.wl("raw = (raw & ~(" + mask + " << " + bitOffset + ")) | ((value << " + bitOffset + ") & (" + mask + " << " + bitOffset + "));");
+						}
+						code.end("}");							
+					}
+
 					Object.entries(vectors).forEach(([k, v]) => {
 
 						let firstIsMarked;
@@ -201,65 +242,83 @@ module.exports = async config => {
 							}
 						}
 
-						if (firstIsMarked) {
-
-							let field = v.fields[firstIndex];
-
-							let fieldName = field.inVector.prefix + (field.inVector.suffix ? "_" + field.inVector.suffix : "");
-
-							let bitOffset = "(" + firstOffset + " + " + firstDistance + " * (index - " + firstIndex + "))";
-							let bitWidth = fieldWidth(field);
-
-							let description = inlineDescription(field);
-							let indexRange = "index in range " + firstIndex + ".." + lastIndex;
-							let valueRange = "value in range 0.." + (Math.pow(2, bitWidth) - 1);
-							let mask = "0x" + (Math.pow(2, bitWidth) - 1).toString(16).toUpperCase();
-
-							code.begin("/**");
-							code.wl("Gets", description);
-							code.wl("@param", indexRange);
-							code.wl("@return", valueRange);
-							code.end("*/");
-							code.begin("__attribute__((always_inline)) unsigned long", "get" + fieldName + "(int index) volatile {");
-							code.wl("return (raw & (" + mask + " << " + bitOffset + ")) >> " + bitOffset + ";");
-							code.end("}");
-
-							code.begin("/**");
-							code.wl("Sets", description);
-							code.wl("@param", indexRange);
-							code.wl("@param", valueRange);
-							code.end("*/");
-							code.begin("__attribute__((always_inline)) unsigned long", "set" + fieldName + "(int index, unsigned long value) volatile {");
-							code.wl("raw = (raw & ~(" + mask + " << " + bitOffset + ")) | ((value << " + bitOffset + ") & (" + mask + " << " + bitOffset + "));");
-							code.end("}");
+					
+					if (firstIsMarked) {
+						let field = v.fields[firstIndex];
+						let fieldName = field.inVector.prefix + (field.inVector.suffix ? "_" + field.inVector.suffix : "");
+						writeAccessors(
+							fieldName, 
+							"(" + firstOffset + " + " + firstDistance + " * (index - " + firstIndex + "))", 
+							fieldWidth(field), 
+							inlineDescription(field),
+							firstIndex,
+							lastIndex
+						);
+						writeAccessors(fieldName, fieldOffset(field), fieldWidth(field) * (lastIndex - firstIndex + 1), inlineDescription(field));
 					}
+						// 	if (firstIsMarked) {
+
+					// 		let field = v.fields[firstIndex];
+
+					// 		let fieldName = field.inVector.prefix + (field.inVector.suffix ? "_" + field.inVector.suffix : "");
+
+					// 		let bitOffset = "(" + firstOffset + " + " + firstDistance + " * (index - " + firstIndex + "))";
+					// 		let bitWidth = fieldWidth(field);
+
+					// 		let description = inlineDescription(field);
+					// 		let indexRange = "index in range " + firstIndex + ".." + lastIndex;
+					// 		let valueRange = "value in range 0.." + (Math.pow(2, bitWidth) - 1);
+					// 		let mask = "0x" + (Math.pow(2, bitWidth) - 1).toString(16).toUpperCase();
+
+					// 		code.begin("/**");
+					// 		code.wl("Gets", description);
+					// 		code.wl("@param", indexRange);
+					// 		code.wl("@return", valueRange);
+					// 		code.end("*/");
+					// 		code.begin("__attribute__((always_inline)) unsigned long", "get" + fieldName + "(int index) volatile {");
+					// 		code.wl("return (raw & (" + mask + " << " + bitOffset + ")) >> " + bitOffset + ";");
+					// 		code.end("}");
+
+					// 		code.begin("/**");
+					// 		code.wl("Sets", description);
+					// 		code.wl("@param", indexRange);
+					// 		code.wl("@param", valueRange);
+					// 		code.end("*/");
+					// 		code.begin("__attribute__((always_inline)) unsigned long", "set" + fieldName + "(int index, unsigned long value) volatile {");
+					// 		code.wl("raw = (raw & ~(" + mask + " << " + bitOffset + ")) | ((value << " + bitOffset + ") & (" + mask + " << " + bitOffset + "));");
+					// 		code.end("}");
+					// }
 
 					});
 
+					// register.fields[0].field.filter(field => !field.inVector).forEach(field => {
+
+					// 	let bitOffset = fieldOffset(field);
+					// 	let bitWidth = fieldWidth(field);
+
+					// 	let description = inlineDescription(field);
+					// 	let range = "value in range 0.." + (Math.pow(2, bitWidth) - 1);
+					// 	let mask = "0x" + (Math.pow(2, bitWidth) - 1).toString(16).toUpperCase();
+
+					// 	code.begin("/**");
+					// 	code.wl("Gets", description);
+					// 	code.wl("@return", range);
+					// 	code.end("*/");
+					// 	code.begin("__attribute__((always_inline)) unsigned long", "get" + field.name + "() volatile {");
+					// 	code.wl("return (raw & (" + mask + " << " + bitOffset + ")) >> " + bitOffset + ";");
+					// 	code.end("}");
+
+					// 	code.begin("/**");
+					// 	code.wl("Sets", description);
+					// 	code.wl("@param", range);
+					// 	code.end("*/");
+					// 	code.begin("__attribute__((always_inline)) unsigned long", "set" + field.name + "(unsigned long value) volatile {");
+					// 	code.wl("raw = (raw & ~(" + mask + " << " + bitOffset + ")) | ((value << " + bitOffset + ") & (" + mask + " << " + bitOffset + "));");
+					// 	code.end("}");
+					// });
+
 					register.fields[0].field.filter(field => !field.inVector).forEach(field => {
-
-						let bitOffset = fieldOffset(field);
-						let bitWidth = fieldWidth(field);
-
-						let description = inlineDescription(field);
-						let range = "value in range 0.." + (Math.pow(2, bitWidth) - 1);
-						let mask = "0x" + (Math.pow(2, bitWidth) - 1).toString(16).toUpperCase();
-
-						code.begin("/**");
-						code.wl("Gets", description);
-						code.wl("@return", range);
-						code.end("*/");
-						code.begin("__attribute__((always_inline)) unsigned long", "get" + field.name + "() volatile {");
-						code.wl("return (raw & (" + mask + " << " + bitOffset + ")) >> " + bitOffset + ";");
-						code.end("}");
-
-						code.begin("/**");
-						code.wl("Sets", description);
-						code.wl("@param", range);
-						code.end("*/");
-						code.begin("__attribute__((always_inline)) unsigned long", "set" + field.name + "(unsigned long value) volatile {");
-						code.wl("raw = (raw & ~(" + mask + " << " + bitOffset + ")) | ((value << " + bitOffset + ") & (" + mask + " << " + bitOffset + "));");
-						code.end("}");
+						writeAccessors(field.name, fieldOffset(field), fieldWidth(field), inlineDescription(field));
 					});
 
 					code.end("};");
