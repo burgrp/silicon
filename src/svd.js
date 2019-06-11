@@ -8,6 +8,11 @@ const rmDir = require("./rmdir.js");
 
 module.exports = async config => {
 
+	async function parseSvd(svdFile) {
+		let svdData = await pro(fs.readFile)(svdFile, "utf8");
+		return (await pro(new xml2js.Parser().parseString)(svdData)).device;
+	}
+
 	return {
 		async init(cli) {
 			return cli.command("svd <svdFile>");
@@ -17,9 +22,16 @@ module.exports = async config => {
 
 			console.info("Generating sources from", svdFile);
 
-			let svdData = await pro(fs.readFile)(svdFile, "utf8");
+			let device = await parseSvd(svdFile);
+			let cpu = (device.cpu || [{ name: [] }])[0].name[0];
+			if (!cpu) {
+				console.info("Warning: Undefined cpu - assuming CM0");
+				cpu = "CM0";
+			}
 
-			let device = (await pro(new xml2js.Parser().parseString)(svdData)).device;
+			let stdDevice = await parseSvd(`${__dirname}/../arm-std-svd/ARM${cpu}.svd`);
+			let sysTick = stdDevice.peripherals[0].peripheral.find(p => p.name[0] === "SysTick");
+			device.peripherals[0].peripheral.push(sysTick);
 
 			if (device.width[0] !== "32") {
 				throw "SVD error: device.width is expected to be 32";
@@ -33,7 +45,7 @@ module.exports = async config => {
 
 					let derived = device.peripherals[0].peripheral.filter(dp => (dp.$ || {}).derivedFrom === peripheral.name[0]);
 
-					let groupName = peripheral.groupName[0];
+					let groupName = (peripheral.groupName || peripheral.name)[0];
 
 					let typeName;
 					if (derived.length > 0) {
@@ -316,12 +328,6 @@ module.exports = async config => {
 					interrupts[i.value[0]] = i.name[0];
 				});
 			});
-
-			let cpu = (device.cpu || [{ name: [] }])[0].name[0];
-			if (!cpu) {
-				console.info("Warning: Undefined cpu - assuming CM0");
-				cpu = "CM0";
-			} 
 
 			Object.assign(package, {
 				silicon: {
