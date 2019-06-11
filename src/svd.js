@@ -104,12 +104,12 @@ module.exports = async config => {
 				code.begin("namespace reg {");
 
 				type.peripheral.registers[0].register.forEach(register => {
-					
+
 					let registerSize = svdInt(register.size);
 					if (registerSize !== 32) {
 						throw `Register ${type.peripheral.name}.${register.name[0]} has size ${registerSize}`;
 					}
-					
+
 					//console.info(register);
 					code.wl();
 					code.begin("/**");
@@ -141,7 +141,7 @@ module.exports = async config => {
 									if (m2 && m2[1] === prefix && m2[3] === suffix) {
 										let i1 = parseInt(m1[2]);
 										let i2 = parseInt(m2[2]);
-										let	min = Math.min(i1, i2);
+										let min = Math.min(i1, i2);
 										let max = Math.max(i1, i2);
 										let key = m1[1] + "#" + m1[3];
 										let v = vectors[key];
@@ -173,7 +173,7 @@ module.exports = async config => {
 						let valueRange = "value in range 0.." + (Math.pow(2, bitWidth) - 1);
 						let indexRange = "index in range " + firstIndex + ".." + lastIndex;
 						let mask = "0x" + (Math.pow(2, bitWidth) - 1).toString(16).toUpperCase();
-						
+
 						code.begin("/**");
 						code.wl("Gets", description);
 						if (indexed) {
@@ -204,7 +204,7 @@ module.exports = async config => {
 							code.begin("__attribute__((always_inline)) unsigned long", "set" + fieldName + "(unsigned long value) volatile {");
 							code.wl("raw = (raw & ~(" + mask + " << " + bitOffset + ")) | ((value << " + bitOffset + ") & (" + mask + " << " + bitOffset + "));");
 						}
-						code.end("}");							
+						code.end("}");
 					}
 
 					Object.entries(vectors).forEach(([k, v]) => {
@@ -242,80 +242,22 @@ module.exports = async config => {
 							}
 						}
 
-					
-					if (firstIsMarked) {
-						let field = v.fields[firstIndex];
-						let fieldName = field.inVector.prefix + (field.inVector.suffix ? "_" + field.inVector.suffix : "");
-						writeAccessors(
-							fieldName, 
-							"(" + firstOffset + " + " + firstDistance + " * (index - " + firstIndex + "))", 
-							fieldWidth(field), 
-							inlineDescription(field),
-							firstIndex,
-							lastIndex
-						);
-						writeAccessors(fieldName, fieldOffset(field), fieldWidth(field) * (lastIndex - firstIndex + 1), inlineDescription(field));
-					}
-						// 	if (firstIsMarked) {
 
-					// 		let field = v.fields[firstIndex];
-
-					// 		let fieldName = field.inVector.prefix + (field.inVector.suffix ? "_" + field.inVector.suffix : "");
-
-					// 		let bitOffset = "(" + firstOffset + " + " + firstDistance + " * (index - " + firstIndex + "))";
-					// 		let bitWidth = fieldWidth(field);
-
-					// 		let description = inlineDescription(field);
-					// 		let indexRange = "index in range " + firstIndex + ".." + lastIndex;
-					// 		let valueRange = "value in range 0.." + (Math.pow(2, bitWidth) - 1);
-					// 		let mask = "0x" + (Math.pow(2, bitWidth) - 1).toString(16).toUpperCase();
-
-					// 		code.begin("/**");
-					// 		code.wl("Gets", description);
-					// 		code.wl("@param", indexRange);
-					// 		code.wl("@return", valueRange);
-					// 		code.end("*/");
-					// 		code.begin("__attribute__((always_inline)) unsigned long", "get" + fieldName + "(int index) volatile {");
-					// 		code.wl("return (raw & (" + mask + " << " + bitOffset + ")) >> " + bitOffset + ";");
-					// 		code.end("}");
-
-					// 		code.begin("/**");
-					// 		code.wl("Sets", description);
-					// 		code.wl("@param", indexRange);
-					// 		code.wl("@param", valueRange);
-					// 		code.end("*/");
-					// 		code.begin("__attribute__((always_inline)) unsigned long", "set" + fieldName + "(int index, unsigned long value) volatile {");
-					// 		code.wl("raw = (raw & ~(" + mask + " << " + bitOffset + ")) | ((value << " + bitOffset + ") & (" + mask + " << " + bitOffset + "));");
-					// 		code.end("}");
-					// }
+						if (firstIsMarked) {
+							let field = v.fields[firstIndex];
+							let fieldName = field.inVector.prefix + (field.inVector.suffix ? "_" + field.inVector.suffix : "");
+							writeAccessors(
+								fieldName,
+								"(" + firstOffset + " + " + firstDistance + " * (index - " + firstIndex + "))",
+								fieldWidth(field),
+								inlineDescription(field),
+								firstIndex,
+								lastIndex
+							);
+							writeAccessors(fieldName, fieldOffset(field), fieldWidth(field) * (lastIndex - firstIndex + 1), inlineDescription(field));
+						}
 
 					});
-
-					// register.fields[0].field.filter(field => !field.inVector).forEach(field => {
-
-					// 	let bitOffset = fieldOffset(field);
-					// 	let bitWidth = fieldWidth(field);
-
-					// 	let description = inlineDescription(field);
-					// 	let range = "value in range 0.." + (Math.pow(2, bitWidth) - 1);
-					// 	let mask = "0x" + (Math.pow(2, bitWidth) - 1).toString(16).toUpperCase();
-
-					// 	code.begin("/**");
-					// 	code.wl("Gets", description);
-					// 	code.wl("@return", range);
-					// 	code.end("*/");
-					// 	code.begin("__attribute__((always_inline)) unsigned long", "get" + field.name + "() volatile {");
-					// 	code.wl("return (raw & (" + mask + " << " + bitOffset + ")) >> " + bitOffset + ";");
-					// 	code.end("}");
-
-					// 	code.begin("/**");
-					// 	code.wl("Sets", description);
-					// 	code.wl("@param", range);
-					// 	code.end("*/");
-					// 	code.begin("__attribute__((always_inline)) unsigned long", "set" + field.name + "(unsigned long value) volatile {");
-					// 	code.wl("raw = (raw & ~(" + mask + " << " + bitOffset + ")) | ((value << " + bitOffset + ") & (" + mask + " << " + bitOffset + "));");
-					// 	code.end("}");
-					// });
 
 					register.fields[0].field.filter(field => !field.inVector).forEach(field => {
 						writeAccessors(field.name, fieldOffset(field), fieldWidth(field), inlineDescription(field));
@@ -375,11 +317,17 @@ module.exports = async config => {
 				});
 			});
 
+			let cpu = (device.cpu || [{ name: [] }])[0].name[0];
+			if (!cpu) {
+				console.info("Warning: Undefined cpu - assuming CM0");
+				cpu = "CM0";
+			} 
+
 			Object.assign(package, {
 				silicon: {
 					target: {
 						name: device.name[0],
-						cpu: device.cpu[0].name[0]
+						cpu, 
 					},
 					sources,
 					symbols,
