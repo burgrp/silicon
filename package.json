@@ -1,6 +1,6 @@
 {
 	"name": "@device.farm/silicon",
-	"version": "1.0.22",
+	"version": "1.0.23",
 	"author": "paul",
 	"dependencies": {
 		"@device.farm/appglue": "1.0.10",
