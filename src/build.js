@@ -10,12 +10,12 @@ module.exports = async config => {
 	return {
 		async init(cli) {
 			return cli.command("build")
-					.option("-v, --verbose", "be verbose, display commands being run")
-					.option("-d, --dependencies [dependencies]", "run 'npm install' to update dependencies prior to the build")
-					.option("-a, --disassembly", "run 'objdump' to disassembly the image after build")
-					.option("-s, --size", "run 'size' to display image size after build")
-					.option("-f, --flash [port]", "flash the image using OpenOCD on given localhost port, defaults to 4444")
-					.option("-l, --loop", "stay in loop and repeat build after each source file modification");
+				.option("-v, --verbose", "be verbose, display commands being run")
+				.option("-d, --dependencies [dependencies]", "run 'npm install' to update dependencies prior to the build")
+				.option("-a, --disassembly", "run 'objdump' to disassembly the image after build")
+				.option("-s, --size", "run 'size' to display image size after build")
+				.option("-f, --flash [port]", "flash the image using OpenOCD on given localhost port, defaults to 4444")
+				.option("-l, --loop", "stay in loop and repeat build after each source file modification");
 
 		},
 
@@ -108,20 +108,20 @@ module.exports = async config => {
 				}
 
 				function mapToArray(map, firstIndex = 0) {
-					return 	Object.entries(map).reduce((acc, [k, v]) => {
+					return Object.entries(map).reduce((acc, [k, v]) => {
 						acc[parseInt(k) - firstIndex] = v;
 						return acc;
 					}, []);
 				}
 
 				let interrupts = mapToArray(cpu.interrupts || {}, 1).concat(
-						mapToArray(
-								siliconPackages.reduce((acc, p) => {
-									Object.entries(p.silicon.interrupts || {}).forEach(([k, v]) => acc[k] = v);
-									return acc;
-								}, {})
-								)
-						);
+					mapToArray(
+						siliconPackages.reduce((acc, p) => {
+							Object.entries(p.silicon.interrupts || {}).forEach(([k, v]) => acc[k] = v);
+							return acc;
+						}, {})
+					)
+				);
 
 
 				let siliconHpp = codeGen();
@@ -130,7 +130,7 @@ module.exports = async config => {
 				siliconHpp.wl("#define SILICON_HPP");
 
 				siliconHpp.wl();
-								siliconHpp.wl("#include <stdlib.h>");
+				siliconHpp.wl("#include <stdlib.h>");
 
 				siliconHpp.wl();
 				siliconHpp.begin("namespace target {");
@@ -160,7 +160,7 @@ module.exports = async config => {
 						});
 					});
 				}
-				
+
 				addIncludes(siliconPackages.filter(p => p.silicon.target));
 				addIncludes(siliconPackages.filter(p => !p.silicon.target));
 
@@ -252,9 +252,13 @@ module.exports = async config => {
 						return res;
 					}
 
-					await exec("halt");
-					await exec("reset halt");
-					await exec("flash write_image erase " + process.cwd() + "/" + imageFile);
+					async function asyncWait(ms) {
+						return new Promise(resolve => setTimeout(resolve, ms));
+					}
+
+					//await exec("halt");
+					//await exec("reset init");
+					await exec("load_image " + process.cwd() + "/" + imageFile);
 					await exec("reset run");
 
 					await connection.end();
