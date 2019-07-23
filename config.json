@@ -5,6 +5,9 @@
 			"cpus": {
 				"CM0": {
 					"module": "./cortex-m0.js"
+				},
+				"CM0+": {
+					"module": "./cortex-m0.js"
 				}
 			}
 		},
