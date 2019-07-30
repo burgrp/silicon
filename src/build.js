@@ -256,9 +256,8 @@ module.exports = async config => {
 						return new Promise(resolve => setTimeout(resolve, ms));
 					}
 
-					//await exec("halt");
-					//await exec("reset init");
-					await exec("load_image " + process.cwd() + "/" + imageFile);
+					await exec("reset halt");
+					await exec("flash write_image erase " + process.cwd() + "/" + imageFile);
 					await exec("reset run");
 
 					await connection.end();
