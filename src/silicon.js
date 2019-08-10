@@ -33,7 +33,7 @@ appglue({ require, file: __dirname + "/../config.json" }).main(async app => {
 		try {
 			await commandToRun();
 		} catch (e) {
-			console.error(e);
+			console.error(e.stack || e);
 			process.exit(1);
 		}
 	} else {

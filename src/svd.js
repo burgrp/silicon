@@ -115,190 +115,242 @@ module.exports = async config => {
 
 				code.begin("namespace reg {");
 
-				type.peripheral.registers[0].register.forEach(register => {
+				function writeTypes(parent) {
 
-					let registerSize = svdInt(register.size);
-					if (registerSize !== 32) {
-						throw `Register ${type.peripheral.name}.${register.name[0]} has size ${registerSize}`;
-					}
-
-					//console.info(register);
-					code.wl();
-					code.begin("/**");
-					code.wl(inlineDescription(register));
-					code.end("*/");
-					code.begin("class", register.name, "{");
-
-					code.wl("volatile unsigned long raw;");
-					code.wl("public:");
-
-					code.begin("__attribute__((always_inline)) void operator= (unsigned long value) volatile {");
-					code.wl("raw = value;");
-					code.end("}");
-					code.begin("__attribute__((always_inline)) operator unsigned long () volatile {");
-					code.wl("return raw;");
-					code.end("}");
-
-					// find field vectors, e.g. STM32F GPIO MODER0..MODER15
-
-					let vectors = {};
-					register.fields[0].field.forEach(f1 => {
-						let m1 = f1.name[0].match(/([a-zA-Z]+)([0-9]+)([a-zA-Z]*)$/);
-						if (m1) {
-							let prefix = m1[1];
-							let suffix = m1[3];
-							register.fields[0].field.forEach(f2 => {
-								if (f1 !== f2) {
-									let m2 = f2.name[0].match(/([a-zA-Z]+)([0-9]+)([a-zA-Z]*)$/);
-									if (m2 && m2[1] === prefix && m2[3] === suffix) {
-										let i1 = parseInt(m1[2]);
-										let i2 = parseInt(m2[2]);
-										let min = Math.min(i1, i2);
-										let max = Math.max(i1, i2);
-										let key = m1[1] + "#" + m1[3];
-										let v = vectors[key];
-										if (!v) {
-											v = {
-												min,
-												max,
-												prefix,
-												suffix,
-												fields: []
-											};
-											vectors[key] = v;
-										} else {
-											v.min = Math.min(v.min, min);
-											v.max = Math.max(v.max, max);
-										}
-										v.fields[i1] = f1;
-										v.fields[i2] = f2;
-									}
-								}
-							});
-						}
+					(parent.cluster || []).forEach(cluster => {
+						code.begin(`namespace ${cluster.name} {`);
+						writeTypes(cluster);
+						code.end(`};`);
 					});
 
-					function writeAccessors(fieldName, bitOffset, bitWidth, description, firstIndex, lastIndex) {
+					(parent.register || []).forEach(register => {
 
-						let indexed = firstIndex !== undefined;
+						let registerName = register.name[0].replace(/[0-9_]*%s/, "");
 
-						let valueRange = "value in range 0.." + (Math.pow(2, bitWidth) - 1);
-						let indexRange = "index in range " + firstIndex + ".." + lastIndex;
-						let mask = "0x" + (Math.pow(2, bitWidth) - 1).toString(16).toUpperCase();
+						let registerSize = svdInt(register.size);
+						let registerRawType = {
+							8: "char",
+							16: "short",
+							32: "long"
+						}[registerSize];
+						if (!registerRawType) {
+							throw `Register ${type.peripheral.name}.${register.name[0]} has unsupported size ${registerSize}`;
+						}
 
+						//console.info(register);
+						code.wl();
 						code.begin("/**");
-						code.wl("Gets", description);
-						if (indexed) {
-							code.wl("@param", indexRange);
-						}
-						code.wl("@return", valueRange);
+						code.wl(inlineDescription(register));
 						code.end("*/");
-						if (indexed) {
-							code.begin("__attribute__((always_inline)) unsigned long", "get" + fieldName + "(int index) volatile {");
-							code.wl("return (raw & (" + mask + " << " + bitOffset + ")) >> " + bitOffset + ";");
-						} else {
-							code.begin("__attribute__((always_inline)) unsigned long", "get" + fieldName + "() volatile {");
-							code.wl("return (raw & (" + mask + " << " + bitOffset + ")) >> " + bitOffset + ";");
-						}
+						code.begin(`class ${registerName} {`);
+
+						code.wl("volatile unsigned", registerRawType, "raw;");
+						code.wl("public:");
+
+						code.begin("__attribute__((always_inline)) void operator= (unsigned long value) volatile {");
+						code.wl("raw = value;");
+						code.end("}");
+						code.begin("__attribute__((always_inline)) operator unsigned long () volatile {");
+						code.wl("return raw;");
 						code.end("}");
 
-						code.begin("/**");
-						code.wl("Sets", description);
-						if (indexed) {
-							code.wl("@param", indexRange);
-						}
-						code.wl("@param", valueRange);
-						code.end("*/");
-						if (indexed) {
-							code.begin("__attribute__((always_inline)) unsigned long", "set" + fieldName + "(int index, unsigned long value) volatile {");
-							code.wl("raw = (raw & ~(" + mask + " << " + bitOffset + ")) | ((value << " + bitOffset + ") & (" + mask + " << " + bitOffset + "));");
-						} else {
-							code.begin("__attribute__((always_inline)) unsigned long", "set" + fieldName + "(unsigned long value) volatile {");
-							code.wl("raw = (raw & ~(" + mask + " << " + bitOffset + ")) | ((value << " + bitOffset + ") & (" + mask + " << " + bitOffset + "));");
-						}
-						code.end("}");
-					}
+						// find field vectors, e.g. STM32F GPIO MODER0..MODER15
 
-					Object.entries(vectors).forEach(([k, v]) => {
-
-						let firstIsMarked;
-						let firstIndex;
-						let firstOffset;
-						let firstDistance;
-						let lastIndex;
-
-						for (let c = 0; c < v.fields.length; c++) {
-							let field = v.fields[c];
-							if (field) {
-								let bitOffset = fieldOffset(field);
-
-								if (firstIndex === undefined) {
-									firstIndex = c;
-									firstOffset = bitOffset;
-								} else {
-									if (firstDistance === undefined) {
-										firstDistance = bitOffset - firstOffset;
-									}
-									let expectedOffset = firstOffset + firstDistance * (c - firstIndex);
-									if (expectedOffset === bitOffset) {
-										if (!firstIsMarked) {
-											v.fields[firstIndex].inVector = v;
-											firstIsMarked = true;
+						let vectors = {};
+						(register.fields || [{ field: [] }])[0].field.forEach(f1 => {
+							let m1 = f1.name[0].match(/([a-zA-Z]+)([0-9]+)([a-zA-Z]*)$/);
+							if (m1) {
+								let prefix = m1[1];
+								let suffix = m1[3];
+								register.fields[0].field.forEach(f2 => {
+									if (f1 !== f2) {
+										let m2 = f2.name[0].match(/([a-zA-Z]+)([0-9]+)([a-zA-Z]*)$/);
+										if (m2 && m2[1] === prefix && m2[3] === suffix) {
+											let i1 = parseInt(m1[2]);
+											let i2 = parseInt(m2[2]);
+											let min = Math.min(i1, i2);
+											let max = Math.max(i1, i2);
+											let key = m1[1] + "#" + m1[3];
+											let v = vectors[key];
+											if (!v) {
+												v = {
+													min,
+													max,
+													prefix,
+													suffix,
+													fields: []
+												};
+												vectors[key] = v;
+											} else {
+												v.min = Math.min(v.min, min);
+												v.max = Math.max(v.max, max);
+											}
+											v.fields[i1] = f1;
+											v.fields[i2] = f2;
 										}
-										field.inVector = v;
-										lastIndex = c;
+									}
+								});
+							}
+						});
+
+						function writeAccessors(fieldName, bitOffset, bitWidth, description, firstIndex, lastIndex) {
+
+							let indexed = firstIndex !== undefined;
+
+							let valueRange = "value in range 0.." + (Math.pow(2, bitWidth) - 1);
+							let indexRange = "index in range " + firstIndex + ".." + lastIndex;
+							let mask = "0x" + (Math.pow(2, bitWidth) - 1).toString(16).toUpperCase();
+
+							code.begin("/**");
+							code.wl("Gets", description);
+							if (indexed) {
+								code.wl("@param", indexRange);
+							}
+							code.wl("@return", valueRange);
+							code.end("*/");
+							if (indexed) {
+								code.begin("__attribute__((always_inline)) unsigned long", "get" + fieldName + "(int index) volatile {");
+								code.wl("return (raw & (" + mask + " << " + bitOffset + ")) >> " + bitOffset + ";");
+							} else {
+								code.begin("__attribute__((always_inline)) unsigned long", "get" + fieldName + "() volatile {");
+								code.wl("return (raw & (" + mask + " << " + bitOffset + ")) >> " + bitOffset + ";");
+							}
+							code.end("}");
+
+							code.begin("/**");
+							code.wl("Sets", description);
+							if (indexed) {
+								code.wl("@param", indexRange);
+							}
+							code.wl("@param", valueRange);
+							code.end("*/");
+							if (indexed) {
+								code.begin("__attribute__((always_inline)) unsigned long", "set" + fieldName + "(int index, unsigned long value) volatile {");
+								code.wl("raw = (raw & ~(" + mask + " << " + bitOffset + ")) | ((value << " + bitOffset + ") & (" + mask + " << " + bitOffset + "));");
+							} else {
+								code.begin("__attribute__((always_inline)) unsigned long", "set" + fieldName + "(unsigned long value) volatile {");
+								code.wl("raw = (raw & ~(" + mask + " << " + bitOffset + ")) | ((value << " + bitOffset + ") & (" + mask + " << " + bitOffset + "));");
+							}
+							code.end("}");
+						}
+
+						Object.entries(vectors).forEach(([k, v]) => {
+
+							let firstIsMarked;
+							let firstIndex;
+							let firstOffset;
+							let firstDistance;
+							let lastIndex;
+
+							for (let c = 0; c < v.fields.length; c++) {
+								let field = v.fields[c];
+								if (field) {
+									let bitOffset = fieldOffset(field);
+
+									if (firstIndex === undefined) {
+										firstIndex = c;
+										firstOffset = bitOffset;
 									} else {
-										v.fields[c] = undefined;
+										if (firstDistance === undefined) {
+											firstDistance = bitOffset - firstOffset;
+										}
+										let expectedOffset = firstOffset + firstDistance * (c - firstIndex);
+										if (expectedOffset === bitOffset) {
+											if (!firstIsMarked) {
+												v.fields[firstIndex].inVector = v;
+												firstIsMarked = true;
+											}
+											field.inVector = v;
+											lastIndex = c;
+										} else {
+											v.fields[c] = undefined;
+										}
 									}
 								}
 							}
-						}
 
+							if (firstIsMarked) {
+								let field = v.fields[firstIndex];
+								let fieldName = field.inVector.prefix + (field.inVector.suffix ? "_" + field.inVector.suffix : "");
+								writeAccessors(
+									fieldName,
+									"(" + firstOffset + " + " + firstDistance + " * (index - " + firstIndex + "))",
+									fieldWidth(field),
+									inlineDescription(field),
+									firstIndex,
+									lastIndex
+								);
+								writeAccessors(fieldName, fieldOffset(field), fieldWidth(field) * (lastIndex - firstIndex + 1), inlineDescription(field));
+							}
 
-						if (firstIsMarked) {
-							let field = v.fields[firstIndex];
-							let fieldName = field.inVector.prefix + (field.inVector.suffix ? "_" + field.inVector.suffix : "");
-							writeAccessors(
-								fieldName,
-								"(" + firstOffset + " + " + firstDistance + " * (index - " + firstIndex + "))",
-								fieldWidth(field),
-								inlineDescription(field),
-								firstIndex,
-								lastIndex
-							);
-							writeAccessors(fieldName, fieldOffset(field), fieldWidth(field) * (lastIndex - firstIndex + 1), inlineDescription(field));
-						}
+						});
 
+						(register.fields || [{ field: [] }])[0].field.filter(field => !field.inVector).forEach(field => {
+							writeAccessors(field.name, fieldOffset(field), fieldWidth(field), inlineDescription(field));
+						});
+
+						code.end("};");
 					});
+				}
 
-					register.fields[0].field.filter(field => !field.inVector).forEach(field => {
-						writeAccessors(field.name, fieldOffset(field), fieldWidth(field), inlineDescription(field));
-					});
 
-					code.end("};");
-				});
+				writeTypes(type.peripheral.registers[0]);
+
 				code.end("};");
 
 				code.begin("class Peripheral {");
 				code.wl("public:");
 				code.begin("union {");
 
-				type.peripheral.registers[0].register.forEach(register => {
+				function writeRegisters(parent, typePrefix) {
 
-					let regOffset = svdInt(register.addressOffset);
+					(parent.cluster || []).forEach(cluster => {
+						code.begin("union {");
+						writeRegisters(cluster, `${typePrefix}${cluster.name}::`);
+						code.end(`} ${cluster.name};`);
+					});
 
-					code.begin("struct {");
-					if (regOffset > 0) {
-						code.wl(`volatile char _space_${register.name}[${regOffset}];`);
-					}
+					(parent.register || []).forEach(register => {
 
-					code.begin("/**");
-					code.wl(inlineDescription(register));
-					code.end("*/");
-					code.wl(`volatile reg::${register.name} ${register.name};`);
+						let dim = svdInt(register.dim || [0]);
+						let registerSize = svdInt(register.size);
+						let dimIncrement = svdInt(register.dimIncrement || [register.size / 8]);
 
-					code.end("};");
-				});
+						let registerOffset = svdInt(register.addressOffset);
+						let registerName = register.name[0].replace(/[0-9_]*%s/, "");
+
+						code.begin("struct {");
+						if (registerOffset > 0) {
+							code.wl(`volatile char _space_${registerName}[0x${registerOffset.toString(16)}];`);
+						}
+
+						if (dim > 1) {
+							code.begin("/**");
+							code.wl(inlineDescription(register));
+							code.end("*/");
+							let space = dimIncrement - registerSize / 8;
+							if (space) {
+								code.begin("struct {");
+								code.wl(`volatile ${typePrefix}${registerName} reg;`);
+								code.wl(`volatile char _space[${space}];`);
+								code.end(`} ${registerName}[${dim}];`);
+							} else {
+								code.wl(`volatile ${typePrefix}${registerName} ${registerName}[${dim}];`);
+							}
+						} else {
+							code.begin("/**");
+							code.wl(inlineDescription(register));
+							code.end("*/");
+							code.wl(`volatile ${typePrefix}${registerName} ${registerName};`);
+						}
+
+						code.end("};");
+
+					});
+
+				}
+
+				writeRegisters(type.peripheral.registers[0], "reg::");
 
 				code.end("};");
 				code.end("};");
@@ -333,7 +385,7 @@ module.exports = async config => {
 				silicon: {
 					target: {
 						name: device.name[0],
-						cpu, 
+						cpu,
 					},
 					sources,
 					symbols,
