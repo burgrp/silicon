@@ -158,13 +158,13 @@ module.exports = async config => {
 
 						let vectors = {};
 						(register.fields || [{ field: [] }])[0].field.forEach(f1 => {
-							let m1 = f1.name[0].match(/([a-zA-Z]+)([0-9]+)([a-zA-Z]*)$/);
+							let m1 = f1.name[0].match(/([a-zA-Z]+)([0-9]+)([a-zA-Z]*)_*$/);
 							if (m1) {
 								let prefix = m1[1];
 								let suffix = m1[3];
 								register.fields[0].field.forEach(f2 => {
 									if (f1 !== f2) {
-										let m2 = f2.name[0].match(/([a-zA-Z]+)([0-9]+)([a-zA-Z]*)$/);
+										let m2 = f2.name[0].match(/([a-zA-Z]+)([0-9]+)([a-zA-Z]*)_*$/);
 										if (m2 && m2[1] === prefix && m2[3] === suffix) {
 											let i1 = parseInt(m1[2]);
 											let i2 = parseInt(m2[2]);
@@ -286,7 +286,7 @@ module.exports = async config => {
 						});
 
 						(register.fields || [{ field: [] }])[0].field.filter(field => !field.inVector).forEach(field => {
-							writeAccessors(field.name, fieldOffset(field), fieldWidth(field), inlineDescription(field));
+							writeAccessors(field.name[0].replace(/_$/, ""), fieldOffset(field), fieldWidth(field), inlineDescription(field));
 						});
 
 						code.end("};");
