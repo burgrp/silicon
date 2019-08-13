@@ -30,8 +30,8 @@ module.exports = async config => {
 			}
 
 			let stdDevice = await parseSvd(`${__dirname}/../arm-std-svd/ARM${cpu}.svd`);
-			let sysTick = stdDevice.peripherals[0].peripheral.find(p => p.name[0] === "SysTick");
-			device.peripherals[0].peripheral.push(sysTick);
+			let missingPeripherals = stdDevice.peripherals[0].peripheral.filter(ps => !device.peripherals[0].peripheral.some(pd => pd.name[0] === ps.name[0]));
+			device.peripherals[0].peripheral = device.peripherals[0].peripheral.concat(missingPeripherals);
 
 			if (device.width[0] !== "32") {
 				throw "SVD error: device.width is expected to be 32";
