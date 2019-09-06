@@ -209,7 +209,7 @@ module.exports = async config => {
 					"--specs=nano.specs",
 					"-fshort-wchar",
 					"-g",
-					"-Og",
+					"-O0",
 					"-std=c++14",
 					"-fno-rtti",
 					"-fno-exceptions",
