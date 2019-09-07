@@ -13,6 +13,7 @@ module.exports = async config => {
 				.option("-v, --verbose", "be verbose, display commands being run")
 				.option("-d, --dependencies [dependencies]", "run 'npm install' to update dependencies prior to the build")
 				.option("-a, --disassembly", "run 'objdump' to disassembly the image after build")
+				.option("-o, --optimize [level]", "set gcc optimization level, defaults to 0")
 				.option("-s, --size", "run 'size' to display image size after build")
 				.option("-f, --flash [port]", "flash the image using OpenOCD on given localhost port, defaults to 4444")
 				.option("-l, --loop", "stay in loop and repeat build after each source file modification");
@@ -209,7 +210,7 @@ module.exports = async config => {
 					"--specs=nano.specs",
 					"-fshort-wchar",
 					"-g",
-					"-O0",
+					`-O${command.optimize === true? "g": command.optimize || 0}`,
 					"-std=c++14",
 					"-fno-rtti",
 					"-fno-exceptions",
