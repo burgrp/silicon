@@ -86,7 +86,7 @@ module.exports = async config => {
 			}
 
 			function inlineDescription(element) {
-				return element.description[0].replace(/[ \r\n]+/g, " ");
+				return element.description && element.description[0].replace(/[ \r\n]+/g, " ");
 			}
 
 			function fieldOffset(field) {
@@ -95,6 +95,16 @@ module.exports = async config => {
 
 			function fieldWidth(field) {
 				return svdInt(field.bitWidth);
+			}
+
+			function fieldEnumValues(field) {
+				return (field.enumeratedValues || [{ enumeratedValue: [] }])[0]
+					.enumeratedValue
+					.map(ev => ({
+						name: ev.name[0],
+						value: ev.value[0],
+						description: inlineDescription(ev)
+					}));
 			}
 
 			await rmDir("generated");
@@ -113,14 +123,13 @@ module.exports = async config => {
 				code.begin("namespace target {");
 				code.begin("namespace", type.typeName, "{");
 
-				code.begin("namespace reg {");
-
 				function writeTypes(parent) {
 
 					(parent.cluster || []).forEach(cluster => {
 						code.begin(`namespace ${cluster.name} {`);
 						writeTypes(cluster);
 						code.end(`};`);
+						code.wl();
 					});
 
 					(parent.register || []).forEach(register => {
@@ -137,12 +146,17 @@ module.exports = async config => {
 							throw `Register ${type.peripheral.name}.${register.name[0]} has unsupported size ${registerSize}`;
 						}
 
+						let declaredEnums = [];
+
 						//console.info(register);
 						code.wl();
 						code.begin("/**");
 						code.wl(inlineDescription(register));
 						code.end("*/");
-						code.begin(`class ${registerName} {`);
+
+						code.begin(`namespace ${registerName} {`);
+
+						code.begin(`class Register {`);
 
 						code.wl("volatile unsigned", registerRawType, "raw;");
 						code.wl("public:");
@@ -193,13 +207,40 @@ module.exports = async config => {
 							}
 						});
 
-						function writeAccessors(fieldName, bitOffset, bitWidth, description, firstIndex, lastIndex) {
+						function writeAccessors(fieldName, bitOffset, bitWidth, description, firstIndex, lastIndex, enumValues) {
 
 							let indexed = firstIndex !== undefined;
 
 							let valueRange = "value in range 0.." + (Math.pow(2, bitWidth) - 1);
 							let indexRange = "index in range " + firstIndex + ".." + lastIndex;
 							let mask = "0x" + (Math.pow(2, bitWidth) - 1).toString(16).toUpperCase();
+
+							let fieldType;
+
+							let getterCast = "";
+							let setterCast = "";
+
+							if (enumValues.length) {
+								fieldType = fieldName;
+
+								if (!declaredEnums.includes(fieldName)) {
+									declaredEnums.push(fieldName);
+									code.begin("enum class " + fieldName + " {");
+									enumValues.forEach(({ name, value, description }) => {
+										if (name.match("^[0-9]")) {
+											name = "_" + name;
+										}
+										code.wl(name + " = " + value + ",");
+									});
+									code.end("};")
+								}
+
+								getterCast = "static_cast<" + fieldType + ">";
+								setterCast = "static_cast<unsigned long>";
+
+							} else {
+								fieldType = "unsigned long";
+							}
 
 							code.begin("/**");
 							code.wl("Gets", description);
@@ -209,11 +250,11 @@ module.exports = async config => {
 							code.wl("@return", valueRange);
 							code.end("*/");
 							if (indexed) {
-								code.begin("__attribute__((always_inline)) unsigned long", "get" + fieldName + "(int index) volatile {");
-								code.wl("return (raw & (" + mask + " << " + bitOffset + ")) >> " + bitOffset + ";");
+								code.begin("__attribute__((always_inline)) " + fieldType + " get" + fieldName + "(int index) volatile {");
+								code.wl("return " + getterCast + "((raw & (" + mask + " << " + bitOffset + ")) >> " + bitOffset + ");");
 							} else {
-								code.begin("__attribute__((always_inline)) unsigned long", "get" + fieldName + "() volatile {");
-								code.wl("return (raw & (" + mask + " << " + bitOffset + ")) >> " + bitOffset + ";");
+								code.begin("__attribute__((always_inline)) " + fieldType + " get" + fieldName + "() volatile {");
+								code.wl("return " + getterCast + "((raw & (" + mask + " << " + bitOffset + ")) >> " + bitOffset + ");");
 							}
 							code.end("}");
 
@@ -225,11 +266,11 @@ module.exports = async config => {
 							code.wl("@param", valueRange);
 							code.end("*/");
 							if (indexed) {
-								code.begin("__attribute__((always_inline)) unsigned long", "set" + fieldName + "(int index, unsigned long value) volatile {");
-								code.wl("raw = (raw & ~(" + mask + " << " + bitOffset + ")) | ((value << " + bitOffset + ") & (" + mask + " << " + bitOffset + "));");
+								code.begin("__attribute__((always_inline)) void set" + fieldName + "(int index, " + fieldType + " value) volatile {");
+								code.wl("raw = (raw & ~(" + mask + " << " + bitOffset + ")) | (((" + setterCast + "(value)) << " + bitOffset + ") & (" + mask + " << " + bitOffset + "));");
 							} else {
-								code.begin("__attribute__((always_inline)) unsigned long", "set" + fieldName + "(unsigned long value) volatile {");
-								code.wl("raw = (raw & ~(" + mask + " << " + bitOffset + ")) | ((value << " + bitOffset + ") & (" + mask + " << " + bitOffset + "));");
+								code.begin("__attribute__((always_inline)) void set" + fieldName + "(" + fieldType + " value) volatile {");
+								code.wl("raw = (raw & ~(" + mask + " << " + bitOffset + ")) | (((" + setterCast + "(value)) << " + bitOffset + ") & (" + mask + " << " + bitOffset + "));");
 							}
 							code.end("}");
 						}
@@ -278,25 +319,41 @@ module.exports = async config => {
 									fieldWidth(field),
 									inlineDescription(field),
 									firstIndex,
-									lastIndex
+									lastIndex,
+									fieldEnumValues(field)
 								);
-								writeAccessors(fieldName, fieldOffset(field), fieldWidth(field) * (lastIndex - firstIndex + 1), inlineDescription(field));
+								writeAccessors(
+									fieldName,
+									fieldOffset(field),
+									fieldWidth(field) * (lastIndex - firstIndex + 1),
+									inlineDescription(field),
+									undefined,
+									undefined,
+									fieldEnumValues(field)
+								);
 							}
 
 						});
 
 						(register.fields || [{ field: [] }])[0].field.filter(field => !field.inVector).forEach(field => {
-							writeAccessors(field.name[0].replace(/_$/, ""), fieldOffset(field), fieldWidth(field), inlineDescription(field));
+							writeAccessors(
+								field.name[0].replace(/_$/, ""),
+								fieldOffset(field),
+								fieldWidth(field),
+								inlineDescription(field),
+								undefined,
+								undefined,
+								fieldEnumValues(field)
+							);
 						});
 
-						code.end("};");
+						code.end("};"); // class
+
+						code.end("};"); // namespace
 					});
 				}
 
-
 				writeTypes(type.peripheral.registers[0]);
-
-				code.end("};");
 
 				code.begin("class Peripheral {");
 				code.wl("public:");
@@ -331,17 +388,17 @@ module.exports = async config => {
 							let space = dimIncrement - registerSize / 8;
 							if (space) {
 								code.begin("struct {");
-								code.wl(`volatile ${typePrefix}${registerName} reg;`);
+								code.wl(`volatile ${typePrefix}${registerName}::Register reg;`);
 								code.wl(`volatile char _space[${space}];`);
 								code.end(`} ${registerName}[${dim}];`);
 							} else {
-								code.wl(`volatile ${typePrefix}${registerName} ${registerName}[${dim}];`);
+								code.wl(`volatile ${typePrefix}${registerName}::Register ${registerName}[${dim}];`);
 							}
 						} else {
 							code.begin("/**");
 							code.wl(inlineDescription(register));
 							code.end("*/");
-							code.wl(`volatile ${typePrefix}${registerName} ${registerName};`);
+							code.wl(`volatile ${typePrefix}${registerName}::Register ${registerName};`);
 						}
 
 						code.end("};");
@@ -350,11 +407,10 @@ module.exports = async config => {
 
 				}
 
-				writeRegisters(type.peripheral.registers[0], "reg::");
+				writeRegisters(type.peripheral.registers[0], "");
 
 				code.end("};");
 				code.end("};");
-
 				code.end("}");
 
 				code.wl();
