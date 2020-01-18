@@ -242,6 +242,13 @@ module.exports = async config => {
 						code.begin("__attribute__((always_inline)) operator unsigned long () volatile {");
 						code.wl("return raw;");
 						code.end("}");
+						code.begin("/**");
+						code.wl("Sets register to zero");
+						code.end("*/");
+						code.begin("__attribute__((always_inline)) Register& zero() volatile {");
+						code.wl("raw = 0;");
+						code.wl("return *(Register*)this;")
+						code.end("}");
 
 						function writeAccessors(fieldName, bitOffset, bitWidth, description, firstIndex, lastIndex, enumeration) {
 
@@ -296,12 +303,13 @@ module.exports = async config => {
 							valueRange("@param value");
 							code.end("*/");
 							if (indexed) {
-								code.begin("__attribute__((always_inline)) void set" + fieldName + "(int index, " + fieldType + " value) volatile {");
-								code.wl("raw = (raw & ~(" + mask + " << " + bitOffset + ")) | (((" + setterCast + "(value)) << " + bitOffset + ") & (" + mask + " << " + bitOffset + "));");
+								code.begin("__attribute__((always_inline)) Register& set" + fieldName + "(int index, " + fieldType + " value) volatile {");
+								code.wl("raw = (raw & ~(" + mask + " << " + bitOffset + ")) | (((" + setterCast + "(value)) << " + bitOffset + ") & (" + mask + " << " + bitOffset + "));");								
 							} else {
-								code.begin("__attribute__((always_inline)) void set" + fieldName + "(" + fieldType + " value) volatile {");
+								code.begin("__attribute__((always_inline)) Register& set" + fieldName + "(" + fieldType + " value) volatile {");
 								code.wl("raw = (raw & ~(" + mask + " << " + bitOffset + ")) | (((" + setterCast + "(value)) << " + bitOffset + ") & (" + mask + " << " + bitOffset + "));");
 							}
+							code.wl("return *(Register*)this;")
 							code.end("}");
 						}
 
@@ -399,7 +407,7 @@ module.exports = async config => {
 
 						code.begin("struct {");
 						if (registerOffset > 0) {
-							code.wl(`volatile char _space_${registerName}[0x${registerOffset.toString(16)}];`);
+							code.wl(`char _space_${registerName}[0x${registerOffset.toString(16)}];`);
 						}
 
 						if (dim > 1) {
@@ -409,17 +417,17 @@ module.exports = async config => {
 							let space = dimIncrement - registerSize / 8;
 							if (space) {
 								code.begin("struct {");
-								code.wl(`volatile ${typePrefix}${registerName}::Register reg;`);
-								code.wl(`volatile char _space[${space}];`);
+								code.wl(`${typePrefix}${registerName}::Register reg;`);
+								code.wl(`char _space[${space}];`);
 								code.end(`} ${registerName}[${dim}];`);
 							} else {
-								code.wl(`volatile ${typePrefix}${registerName}::Register ${registerName}[${dim}];`);
+								code.wl(`${typePrefix}${registerName}::Register ${registerName}[${dim}];`);
 							}
 						} else {
 							code.begin("/**");
 							code.wl(inlineDescription(register));
 							code.end("*/");
-							code.wl(`volatile ${typePrefix}${registerName}::Register ${registerName};`);
+							code.wl(`${typePrefix}${registerName}::Register ${registerName};`);
 						}
 
 						code.end("};");
@@ -438,7 +446,7 @@ module.exports = async config => {
 
 				[type.peripheral].concat(type.derived).forEach(p => {
 					let symbol = p.name[0].toUpperCase();
-					code.wl("extern " + type.typeName + "::Peripheral", symbol + ";");
+					code.wl("extern volatile " + type.typeName + "::Peripheral", symbol + ";");
 					symbols["_ZN6target" + symbol.length + symbol + "E"] = p.baseAddress[0];
 				});
 

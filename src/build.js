@@ -229,7 +229,7 @@ module.exports = async config => {
 				await run(cpu.gccPrefix + "gcc", ...gccParams);
 
 				if (command.disassembly) {
-					await run(cpu.gccPrefix + "objdump", "--section=.text", "-D", imageFile);
+					await run(cpu.gccPrefix + "objdump", "--section=.text", "-DS", imageFile);
 				}
 
 				if (command.size) {
