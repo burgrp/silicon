@@ -97,16 +97,6 @@ module.exports = async config => {
 				return svdInt(field.bitWidth);
 			}
 
-			function fieldEnumValues(field) {
-				return (field.enumeratedValues || [{ enumeratedValue: [] }])[0]
-					.enumeratedValue
-					.map(ev => ({
-						name: ev.name[0],
-						value: ev.value[0],
-						description: inlineDescription(ev)
-					}));
-			}
-
 			await rmDir("generated");
 
 			await pro(fs.mkdir)("generated");
@@ -123,11 +113,11 @@ module.exports = async config => {
 				code.begin("namespace target {");
 				code.begin("namespace", type.typeName, "{");
 
-				function writeTypes(parent) {
+				function writeTypes(parent, namespace) {
 
 					(parent.cluster || []).forEach(cluster => {
 						code.begin(`namespace ${cluster.name} {`);
-						writeTypes(cluster);
+						writeTypes(cluster, namespace + "::" + cluster.name);
 						code.end(`};`);
 						code.wl();
 					});
@@ -146,30 +136,7 @@ module.exports = async config => {
 							throw `Register ${type.peripheral.name}.${register.name[0]} has unsupported size ${registerSize}`;
 						}
 
-						let declaredEnums = [];
-
-						//console.info(register);
-						code.wl();
-						code.begin("/**");
-						code.wl(inlineDescription(register));
-						code.end("*/");
-
-						code.begin(`namespace ${registerName} {`);
-
-						code.begin(`class Register {`);
-
-						code.wl("volatile unsigned", registerRawType, "raw;");
-						code.wl("public:");
-
-						code.begin("__attribute__((always_inline)) void operator= (unsigned long value) volatile {");
-						code.wl("raw = value;");
-						code.end("}");
-						code.begin("__attribute__((always_inline)) operator unsigned long () volatile {");
-						code.wl("return raw;");
-						code.end("}");
-
 						// find field vectors, e.g. STM32F GPIO MODER0..MODER15
-
 						let vectors = {};
 						(register.fields || [{ field: [] }])[0].field.forEach(f1 => {
 							let m1 = f1.name[0].match(/([a-zA-Z]+)([0-9]+)([a-zA-Z]*)_*$/);
@@ -201,45 +168,108 @@ module.exports = async config => {
 											}
 											v.fields[i1] = f1;
 											v.fields[i2] = f2;
+											f1.vector = v;
+											f2.vector = v;
 										}
 									}
 								});
 							}
 						});
 
-						function writeAccessors(fieldName, bitOffset, bitWidth, description, firstIndex, lastIndex, enumValues) {
+						let enums = (register.fields || [{ field: [] }])[0]
+							.field
+							.filter(field =>
+								field.enumeratedValues &&
+								field.enumeratedValues.length === 1 &&
+								(
+									(field.vector && field === field.vector.fields[0]) ||
+									!field.vector
+								)
+							)
+							.reduce((acc, field) => ([
+								...acc,
+								{
+									name: field.vector ?
+										field.vector.prefix + (field.vector.suffix ? "_" + field.vector.suffix : "") :
+										field.name[0],
+									values: field.enumeratedValues[0]
+										.enumeratedValue
+										.reduce((acc, ev) => ({
+											...acc,
+											[ev.name[0].replace(/^[0-9]+$/, (inlineDescription(ev) || ("_" + ev.name[0])).replace(/[^0-9a-zA-Z]/g, "_").replace(/__*/g, "_").toUpperCase()).replace(/^(?=[0-9])/, "_")]: {
+												description: inlineDescription(ev),
+												value: ev.value[0]
+											}
+										}), {}),
+									fields: field.vector ? field.vector.fields : [field]
+								}
+							]), []);
+
+						enums.forEach(e => e.fields.forEach(field => {
+							field.enumeration = e;
+						}));
+
+						//console.info(register);
+						code.wl();
+						code.begin("/**");
+						code.wl(inlineDescription(register));
+						code.end("*/");
+
+						code.begin(`namespace ${registerName} {`);
+
+						enums.forEach(e => {
+							code.begin("enum class " + e.name + " {");
+							Object.entries(e.values).forEach(([memberName, member]) => {
+								if (member.description) {
+									code.wl("// " + member.description);
+								}
+								code.wl(memberName + " = " + member.value + ",");
+							});
+							code.end("};")
+							code.wl();
+						});
+
+
+
+						code.begin(`class Register {`);
+
+						code.wl("volatile unsigned", registerRawType, "raw;");
+						code.wl("public:");
+
+						code.begin("__attribute__((always_inline)) void operator= (unsigned long value) volatile {");
+						code.wl("raw = value;");
+						code.end("}");
+						code.begin("__attribute__((always_inline)) operator unsigned long () volatile {");
+						code.wl("return raw;");
+						code.end("}");
+
+						function writeAccessors(fieldName, bitOffset, bitWidth, description, firstIndex, lastIndex, enumeration) {
 
 							let indexed = firstIndex !== undefined;
 
-							let valueRange = "value in range 0.." + (Math.pow(2, bitWidth) - 1);
-							let indexRange = "index in range " + firstIndex + ".." + lastIndex;
 							let mask = "0x" + (Math.pow(2, bitWidth) - 1).toString(16).toUpperCase();
+							let indexRange = "index in range " + firstIndex + ".." + lastIndex;
 
 							let fieldType;
+							let valueRange;
 
 							let getterCast = "";
 							let setterCast = "";
 
-							if (enumValues.length) {
-								fieldType = fieldName;
-
-								if (!declaredEnums.includes(fieldName)) {
-									declaredEnums.push(fieldName);
-									code.begin("enum class " + fieldName + " {");
-									enumValues.forEach(({ name, value, description }) => {
-										if (name.match("^[0-9]")) {
-											name = "_" + name;
-										}
-										code.wl(name + " = " + value + ",");
-									});
-									code.end("};")
-								}
-
+							if (enumeration) {
+								fieldType = namespace + "::" + registerName + "::" + enumeration.name;
 								getterCast = "static_cast<" + fieldType + ">";
 								setterCast = "static_cast<unsigned long>";
-
+								valueRange = prolog => {
+									code.wl(prolog + " enumeration value:")
+									Object.entries(enumeration.values).forEach(([name, value]) => code.wl(fieldType + "::" + name + " (" + value.value + ") " + value.description));
+								};
+							} else if (bitWidth === 1) {
+								fieldType = "bool";
+								valueRange = prolog => code.wl(prolog + " boolean value");
 							} else {
 								fieldType = "unsigned long";
+								valueRange = prolog => code.wl(prolog + " value in range 0.." + (Math.pow(2, bitWidth) - 1));
 							}
 
 							code.begin("/**");
@@ -247,7 +277,7 @@ module.exports = async config => {
 							if (indexed) {
 								code.wl("@param", indexRange);
 							}
-							code.wl("@return", valueRange);
+							valueRange("@return");
 							code.end("*/");
 							if (indexed) {
 								code.begin("__attribute__((always_inline)) " + fieldType + " get" + fieldName + "(int index) volatile {");
@@ -263,7 +293,7 @@ module.exports = async config => {
 							if (indexed) {
 								code.wl("@param", indexRange);
 							}
-							code.wl("@param", valueRange);
+							valueRange("@param value");
 							code.end("*/");
 							if (indexed) {
 								code.begin("__attribute__((always_inline)) void set" + fieldName + "(int index, " + fieldType + " value) volatile {");
@@ -320,16 +350,7 @@ module.exports = async config => {
 									inlineDescription(field),
 									firstIndex,
 									lastIndex,
-									fieldEnumValues(field)
-								);
-								writeAccessors(
-									fieldName,
-									fieldOffset(field),
-									fieldWidth(field) * (lastIndex - firstIndex + 1),
-									inlineDescription(field),
-									undefined,
-									undefined,
-									fieldEnumValues(field)
+									field.enumeration
 								);
 							}
 
@@ -343,7 +364,7 @@ module.exports = async config => {
 								inlineDescription(field),
 								undefined,
 								undefined,
-								fieldEnumValues(field)
+								field.enumeration
 							);
 						});
 
@@ -353,7 +374,7 @@ module.exports = async config => {
 					});
 				}
 
-				writeTypes(type.peripheral.registers[0]);
+				writeTypes(type.peripheral.registers[0], "target::" + type.typeName);
 
 				code.begin("class Peripheral {");
 				code.wl("public:");
