@@ -4,6 +4,7 @@ const spawn = require("child_process").spawn;
 const codeGen = require("./code-gen.js");
 const rmDir = require("./rmdir.js");
 const Telnet = require("telnet-client");
+const path = require("path");
 
 module.exports = async config => {
 
@@ -62,6 +63,8 @@ module.exports = async config => {
 
 				let packages = {};
 
+				let projectRoot = path.resolve(".");
+
 				async function scan(directory) {
 
 					if (command.verbose) {
@@ -82,7 +85,7 @@ module.exports = async config => {
 						package.directory = directory;
 
 						for (let dep in package.dependencies) {
-							await scan("./node_modules/" + dep);
+							await scan(projectRoot + "/node_modules/" + dep);
 						}
 
 						packages[package.name] = package;
@@ -90,7 +93,7 @@ module.exports = async config => {
 
 				}
 
-				await scan(".");
+				await scan(projectRoot);
 				let siliconPackages = Object.values(packages).filter(p => p.silicon);
 
 				let target;
@@ -156,7 +159,7 @@ module.exports = async config => {
 				function addIncludes(packages) {
 					packages.forEach(p => {
 						(p.silicon.sources || []).forEach(s => {
-							siliconHpp.wl(`#include "../${p.directory}/${s}"`);
+							siliconHpp.wl(`#include "${p.directory}/${s}"`);
 							watched.push(`${p.directory}/${s}`);
 						});
 					});
