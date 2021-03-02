@@ -9,18 +9,19 @@ const rmDir = require("./rmdir.js");
 module.exports = async config => {
 
 	async function parseSvd(svdFile) {
+		console.info(`Parsing SVD file ${svdFile}`);
 		let svdData = await pro(fs.readFile)(svdFile, "utf8");
 		return (await pro(new xml2js.Parser().parseString)(svdData)).device;
 	}
 
 	return {
 		async init(cli) {
-			return cli.command("svd <svdFile>");
+			return cli.command("svd <svdFile> [svdFiles...]");
 		},
 
-		async start(command, svdFile) {
+		async start(command, svdFile, svdFiles) {
 
-			console.info("Generating sources from", svdFile);
+			//console.info("Generating sources from", svdFile);
 
 			let device = await parseSvd(svdFile);
 			let cpu = (device.cpu || [{ name: [] }])[0].name[0];
@@ -29,8 +30,8 @@ module.exports = async config => {
 				cpu = "CM0";
 			}
 
-			let stdDevice = await parseSvd(`${__dirname}/../arm-std-svd/ARM${cpu}.svd`);
-			let missingPeripherals = stdDevice.peripherals[0].peripheral.filter(ps => !device.peripherals[0].peripheral.some(pd => pd.name[0] === ps.name[0]));
+			let otherSvdFiles = await Promise.all([...svdFiles, `${__dirname}/../arm-std-svd/ARM${cpu}.svd`].map(fn => parseSvd(fn)));
+			let missingPeripherals = otherSvdFiles.flatMap(device => device.peripherals[0].peripheral).filter(ps => !device.peripherals[0].peripheral.some(pd => pd.name[0] === ps.name[0]));
 			device.peripherals[0].peripheral = device.peripherals[0].peripheral.concat(missingPeripherals);
 
 			if (device.width[0] !== "32") {
@@ -241,6 +242,22 @@ module.exports = async config => {
 						code.end("}");
 						code.begin("__attribute__((always_inline)) operator unsigned long () volatile {");
 						code.wl("return raw;");
+						code.end("}");
+						code.begin("/**");
+						code.wl("Returns copy of the register");
+						code.end("*/");
+						code.begin("__attribute__((always_inline)) Register copy() volatile {");
+						code.wl("Register reg;");
+						code.wl("reg.raw = this->raw;");
+						code.wl("return reg;");
+						code.end("}");
+						code.begin("/**");
+						code.wl("Returns empty copy of the register");
+						code.end("*/");
+						code.begin("__attribute__((always_inline)) Register bare() volatile {");
+						code.wl("Register reg;");
+						code.wl("reg.raw = 0;");
+						code.wl("return reg;");
 						code.end("}");
 						code.begin("/**");
 						code.wl("Sets register to zero");
