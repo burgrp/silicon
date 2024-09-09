@@ -17,8 +17,9 @@ module.exports = async config => {
 				.option("-o, --optimize [level]", "set gcc optimization level, defaults to 0")
 				.option("-s, --size", "run 'size' to display image size after build")
 				.option("-f, --flash [port]", "flash the image using OpenOCD on given localhost port, defaults to 4444")
-				.option("-l, --loop", "stay in loop and repeat build after each source file modification");
-
+				.option("-l, --loop", "stay in loop and repeat build after each source file modification")
+				.option("--ldscript [ldscript]", "custom linker script file")
+				.option("--start [start]", "custom startup assembly file");
 		},
 
 		async start(command) {
@@ -208,7 +209,7 @@ module.exports = async config => {
 
 				let gccParams = [
 					"-I", "build",
-					"-T", cpu.ldScript,
+					"-T", command.ldscript || cpu.ldScript,
 					"-nostartfiles",
 					"--specs=nano.specs",
 					"-fshort-wchar",
@@ -225,7 +226,7 @@ module.exports = async config => {
 					}, []),
 					"-o", imageFile,
 					interruptsSFile,
-					cpu.startS,
+					command.start || cpu.startS,
 					siliconCppFile
 				];
 
