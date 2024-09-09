@@ -212,7 +212,6 @@ module.exports = async config => {
 					"-T", command.ldscript || cpu.ldScript,
 					"-nostartfiles",
 					"--specs=nano.specs",
-					"-fshort-wchar",
 					"-g",
 					`-O${command.optimize === true? "g": command.optimize || 0}`,
 					"-std=c++14",
