@@ -65,6 +65,7 @@ module.exports = async config => {
 				let packages = {};
 
 				let projectRoot = path.resolve(".");
+				let projectJson;
 
 				async function scan(directory) {
 
@@ -74,6 +75,10 @@ module.exports = async config => {
 
 					let package = JSON.parse(await pro(fs.readFile)(directory + "/package.json", "utf8"));
 					watched.push(directory + "/package.json");
+
+					if (!projectJson) {
+						projectJson = package;
+					}
 
 					if (packages[package.name]) {
 
@@ -128,7 +133,6 @@ module.exports = async config => {
 					)
 				);
 
-
 				let siliconHpp = codeGen();
 
 				siliconHpp.wl("#ifndef SILICON_HPP");
@@ -155,6 +159,26 @@ module.exports = async config => {
 				writeInterrupts("All", 0, interrupts.length);
 				siliconHpp.end("}");
 				siliconHpp.end("}");
+				siliconHpp.wl();
+
+				siliconHpp.begin("namespace project {");
+				siliconHpp.wl(`const char* name = "${projectJson.name}";`);
+				siliconHpp.wl(`const char* description = "${projectJson.description}";`);
+				siliconHpp.wl(`const char* author = "${projectJson.author}";`);
+				siliconHpp.wl(`const char* license = "${projectJson.license}";`);
+				siliconHpp.wl(`const char* versionStr = "${projectJson.version}";`);
+				siliconHpp.wl(`const int versionInt[] = { ${projectJson.version.replaceAll(".", ", ")} };`);
+
+				if (projectJson.silicon && projectJson.silicon.symbols) {
+					siliconHpp.begin("namespace symbols {");
+					for (let symbols in projectJson.silicon.symbols) {
+						siliconHpp.wl(`const int ${symbols} = ${projectJson.silicon.symbols[symbols]};`);
+					}
+					siliconHpp.end("}");
+				}
+
+				siliconHpp.end("}");
+
 				siliconHpp.wl();
 
 				function addIncludes(packages) {
@@ -213,12 +237,13 @@ module.exports = async config => {
 					"-nostartfiles",
 					"--specs=nano.specs",
 					"-g",
-					`-O${command.optimize === true? "g": command.optimize || 0}`,
+					`-O${command.optimize === true ? "g" : command.optimize || 0}`,
 					"-std=c++14",
 					"-fno-rtti",
 					"-fno-exceptions",
 					"-ffunction-sections",
 					"-fdata-sections",
+					"-flto",
 					...cpu.gccParams,
 					...siliconPackages.reduce((acc, p) => {
 						return acc.concat(Object.entries(p.silicon.symbols || {}).map(([k, v]) => `-Wl,--defsym,${k}=${v}`));
